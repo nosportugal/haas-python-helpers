@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='otel-log-wrapper',
-    version='0.0.1',
+    version='0.0.2',
     url='https://github.com/nosportugal/haas-python-helpers/otel-log-wrapper',
     author='Filipe Carvalho',
     author_email='filipe.carvalho@nos.pt',

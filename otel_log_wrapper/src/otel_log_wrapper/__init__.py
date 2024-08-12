@@ -1,0 +1,1 @@
+from .otlp_log_wrapper import LogConfiguration

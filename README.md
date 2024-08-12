@@ -6,4 +6,4 @@ Python packages to help in automation development
 
 Setup python logging facility to send logs to a OTEL endpoint
 
-[Documentation](otel-log-wrapper/README.md)
+[Documentation](otel_log_wrapper/README.md)

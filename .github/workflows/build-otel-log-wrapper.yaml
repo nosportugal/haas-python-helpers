@@ -1,4 +1,4 @@
-name: Build otel-log-wrapper
+name: Build otel_log_wrapper
 
 
 on:
@@ -29,10 +29,10 @@ jobs:
 
     - name: Build package
       run: |
-        cd otel-log-wrapper
+        cd otel_log_wrapper
         python -m build
 
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
-        files: ./otel-log-wrapper/dist/*
+        files: ./otel_log_wrapper/dist/*

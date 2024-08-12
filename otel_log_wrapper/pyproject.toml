@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "otel_log_wrapper"
+version = "0.0.2"
+description = "Description of my package"
+authors = [
+    { name="Filipe Carvalho", email="filipe.carvalho@nos.pt" },
+]
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.urls]
+Homepage = "https://github.com/nosportugal/haas-python-helpers/otel_log_wrapper"
+Issues = "https://github.com/nosportugal/haas-python-helpers/issues"
+
+[dynamic]
+dependencies = ['opentelemetry-exporter-otlp', 'opentelemetry-instrumentation-logging']

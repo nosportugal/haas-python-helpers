@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "otel_log_wrapper"
-version = "0.0.4"
+version = "0.0.5"
 description = "Description of my package"
 authors = [
     { name="Filipe Carvalho", email="filipe.carvalho@nos.pt" },

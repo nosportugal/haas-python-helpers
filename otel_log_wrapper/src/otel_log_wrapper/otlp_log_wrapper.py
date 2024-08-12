@@ -31,7 +31,7 @@ class LogConfiguration:
             print('Not found a logging_config.json file')
 
         # configure OTLP
-        if os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT'):
+        if not os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT'):
             logging.debug('OTEL_EXPORTER_OTLP_ENDPOINT not found.')
             self._setup_otlp()
 

@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nosportugal/haas-gcp-functions/function_v1.schema.json",
+  "description": "Schema for validating GCP function configurations (v1)",
+  "type": "object",
+  "properties": {
+    "functions": {
+      "type": "array",
+      "description": "List of functions to be deployed.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the function."
+          },
+          "version": {
+            "type": "integer",
+            "enum": [1],
+            "description": "Version of the function configuration. Must be 1 for this schema."
+          },
+          "source_folder": {
+            "type": "string",
+            "description": "Path to the folder containing function code."
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the function."
+          },
+          "runtime": {
+            "type": "string",
+            "description": "Runtime environment for the function, e.g., python38."
+          },
+          "available_memory_mb": {
+            "type": "integer",
+            "default": 128,
+            "description": "Available memory in MB for the function."
+          },
+          "timeout": {
+            "type": "integer",
+            "default": 30,
+            "description": "Execution timeout for the function in seconds."
+          },
+          "entry_point": {
+            "type": "string",
+            "description": "Entry point for the function (e.g., main function to execute)."
+          },
+          "trigger_http": {
+            "type": "boolean",
+            "description": "If true, the function is triggered by an HTTP request."
+          },
+          "labels": {
+            "type": "object",
+            "description": "Labels for the function, defined as key-value pairs for metadata.",
+            "additionalProperties": { "type": "string" }
+          },
+          "environment_variables": {
+            "type": "object",
+            "description": "Environment variables for the function, defined as key-value pairs.",
+            "additionalProperties": { "type": "string" }
+          },
+          "build_environment_variables": {
+            "type": "object",
+            "description": "Build environment variables for the function, defined as key-value pairs.",
+            "additionalProperties": { "type": "string" }
+          },
+          "vpc_connector": {
+            "type": "string",
+            "description": "VPC connector to use, if applicable."
+          },
+          "vpc_connector_egress_settings": {
+            "type": "string",
+            "default": "ALL_TRAFFIC",
+            "description": "Egress settings for the VPC connector, controlling outbound network traffic."
+          },
+          "ingress_settings": {
+            "type": "string",
+            "default": "ALLOW_INTERNAL_ONLY",
+            "description": "Ingress settings to control traffic access to the function."
+          },
+          "max_instances": {
+            "type": "integer",
+            "description": "Maximum number of instances allowed for the function."
+          },
+          "min_instances": {
+            "type": "integer",
+            "default": 0,
+            "description": "Minimum number of instances to keep warm for the function."
+          },
+          "event_trigger": {
+            "type": "object",
+            "description": "Event trigger configuration for the function. Used when the function is triggered by an event.",
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "description": "Type of event that triggers the function, e.g., 'google.storage.object.finalize'."
+              },
+              "resource": {
+                "type": "string",
+                "description": "Resource identifier for the event, such as a bucket name for storage events."
+              },
+              "failure_policy": {
+                "type": "object",
+                "description": "Policy for handling event failures.",
+                "properties": {
+                  "retry": {
+                    "type": "boolean",
+                    "description": "If true, retries event processing upon failure."
+                  }
+                },
+                "required": ["retry"],
+                "unevaluatedProperties": false
+              }
+            },
+            "required": ["event_type", "resource"],
+            "unevaluatedProperties": false
+          },
+          "secret_environment_variables": {
+            "type": "array",
+            "description": "Secret environment variables for the function, defined as an array of secrets.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "Name of the environment variable that holds the secret."
+                },
+                "secret": {
+                  "type": "string",
+                  "description": "Name of the secret resource to retrieve."
+                },
+                "version": {
+                  "type": "string",
+                  "description": "Version of the secret to use, e.g., 'latest'."
+                }
+              },
+              "required": ["key", "secret", "version"]
+            }
+          }
+        },
+        "required": ["name", "version", "source_folder", "runtime", "entry_point"],
+        "unevaluatedProperties": false
+      }
+    }
+  },
+  "required": ["functions"],
+  "unevaluatedProperties": false
+}

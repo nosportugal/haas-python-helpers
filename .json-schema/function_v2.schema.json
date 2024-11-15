@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nosportugal/haas-gcp-functions/function_v2.schema.json",
+  "description": "Schema for validating GCP function configurations (v2)",
+  "type": "object",
+  "properties": {
+    "functions": {
+      "type": "array",
+      "description": "List of functions to be deployed.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the function."
+          },
+          "version": {
+            "type": "integer",
+            "enum": [2],
+            "description": "Version of the function configuration. Must be 2 for this schema."
+          },
+          "source_folder": {
+            "type": "string",
+            "description": "Relative path to the folder containing function code."
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the function. Can be null if not provided."
+          },
+          "build_config": {
+            "type": "object",
+            "description": "Build configuration settings for the function.",
+            "properties": {
+              "runtime": {
+                "type": "string",
+                "description": "Runtime environment for the function, e.g., python311."
+              },
+              "entry_point": {
+                "type": "string",
+                "description": "Entry point for the function (e.g., main function to execute)."
+              },
+              "environment_variables": {
+                "type": "object",
+                "description": "Environment variables for the function, defined as key-value pairs.",
+                "additionalProperties": { "type": ["string", "integer", "boolean"] }
+              }
+            },
+            "required": ["runtime", "entry_point"]
+          },
+          "service_config": {
+            "type": "object",
+            "description": "Service configuration settings for the function.",
+            "properties": {
+              "timeout_seconds": {
+                "type": "integer",
+                "description": "Execution timeout for the function in seconds."
+              },
+              "available_memory": {
+                "type": "string",
+                "description": "Memory allocated to the function, e.g., '128Mi' for 128 MB."
+              },
+              "max_instance_request_concurrency": {
+                "type": "integer",
+                "description": "Maximum number of concurrent requests allowed per instance."
+              },
+              "available_cpu": {
+                "type": "string",
+                "description": "Number of CPUs allocated to the function. Can be null if unspecified."
+              },
+              "environment_variables": {
+                "type": "object",
+                "description": "Build environment variables for the function, defined as key-value pairs.",
+                "additionalProperties": { "type": ["string", "integer", "boolean"] }
+              },
+              "max_instance_count": {
+                "type": "integer",
+                "description": "Maximum number of instances allowed for the function."
+              },
+              "min_instance_count": {
+                "type": "integer",
+                "description": "Minimum number of instances to keep warm for the function."
+              },
+              "vpc_connector": {
+                "type": "string",
+                "description": "VPC connector to use, if applicable. Can be null if not configured."
+              },
+              "vpc_connector_egress_settings": {
+                "type": "string",
+                "description": "Egress settings for the VPC connector. Can be null if unspecified."
+              },
+              "ingress_settings": {
+                "type": "string",
+                "description": "Ingress settings to control traffic access to the function."
+              },
+              "all_traffic_on_latest_revision": {
+                "type": "boolean",
+                "description": "If true, 100% of traffic is routed to the latest revision. Can be null."
+              },
+              "secret_environment_variables": {
+                "type": "array",
+                "description": "Secret environment variables for the function, defined as an array of secrets.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "description": "Name of the environment variable that holds the secret."
+                    },
+                    "secret": {
+                      "type": "string",
+                      "description": "Name of the secret resource to retrieve."
+                    },
+                    "version": {
+                      "type": "string",
+                      "description": "Version of the secret to use, e.g., 'latest'."
+                    }
+                  },
+                  "required": ["key", "secret", "version"]
+                }
+              }
+            },
+            "required": ["timeout_seconds", "available_memory", "max_instance_request_concurrency"]
+          },
+          "event_trigger": {
+            "type": "object",
+            "description": "Event trigger for the function. Null if triggered by an HTTP request.",
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "description": "Type of event that triggers the function, e.g., 'google.storage.object.finalize'."
+              },
+              "retry_policy": {
+                "type": "string",
+                "description": "Retry policy for the event trigger, if applicable."
+              }
+            },
+            "required": ["event_type"]
+          },
+          "labels": {
+            "type": "object",
+            "description": "Labels for the function, defined as key-value pairs for metadata.",
+            "additionalProperties": { "type": "string" }
+          }
+        },
+        "required": ["name", "version", "source_folder", "build_config", "service_config"],
+        "unevaluatedProperties": false
+      }
+    }
+  },
+  "required": ["functions"],
+  "unevaluatedProperties": false
+}

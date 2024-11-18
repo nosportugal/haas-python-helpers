@@ -135,7 +135,8 @@
                 }
               },
               "required": ["key", "secret", "version"]
-            }
+            },
+            "minItems": 1
           }
         },
         "required": ["name", "version", "source_folder", "runtime", "entry_point"],

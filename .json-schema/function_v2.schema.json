@@ -116,7 +116,8 @@
                     }
                   },
                   "required": ["key", "secret", "version"]
-                }
+                },
+                "minItems": 1
               }
             },
             "required": ["timeout_seconds", "available_memory", "max_instance_request_concurrency"]

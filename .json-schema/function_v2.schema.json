@@ -28,7 +28,7 @@
           },
           "description": {
             "type": "string",
-            "description": "Description of the function. Can be null if not provided",
+            "description": "Description of the function",
             "errorMessage": "'description' property must be a string if provided or must be omitted"
           },
           "build_config": {
@@ -36,20 +36,20 @@
             "description": "Build configuration settings for the function",
             "properties": {
               "runtime": {
-                "type": "string",
-                "description": "Runtime environment for the function, e.g., python311",
-                "errorMessage": "'runtime' 'build_config' is required and must specify the function's runtime as a string"
-              },
+            "type": "string",
+            "description": "Runtime environment for the function, e.g., python38",
+            "errorMessage": "'runtime' is required and must specify the function's runtime as a string"
+          },
               "entry_point": {
                 "type": "string",
                 "description": "Entry point for the function (e.g., main function to execute)",
-                "errorMessage": "'entry_point' 'build_config' is required and must specify the function's entry point as a string"
+                "errorMessage": "'entry_point' is required and must be a string representing the main function entry point"
               },
               "environment_variables": {
                 "type": "object",
                 "description": "Environment variables for the function, defined as key-value pairs",
-                "additionalProperties": { "type": ["string", "integer", "boolean"] },
-                "errorMessage": "'environment_variables' 'build_config' must be an object with key-value pairs of strings, integers, or booleans"
+                "additionalProperties": { "type": "string" },
+                "errorMessage": "'environment_variables' must be an object with key-value pairs if provided or must be omitted"
               }
             },
             "required": ["runtime", "entry_point"],
@@ -62,22 +62,22 @@
               "timeout_seconds": {
                 "type": "integer",
                 "description": "Execution timeout for the function in seconds",
-                "errorMessage": "'timeout_seconds' is required and must be an integer"
+                "errorMessage": "'timeout_seconds' must be an integer if provided or must be omitted"
               },
               "available_memory": {
                 "type": "string",
                 "description": "Memory allocated to the function, e.g., '128Mi' for 128 MB",
                 "pattern": "^[0-9]+(k|M|G|Mi|Gi)$",
-                "errorMessage": "'available_memory' is required and must be a string specifying memory (e.g., '128Mi')"
+                "errorMessage": "'available_memory' must be a string specifying memory (e.g., '128Mi') if provided or must be omitted"
               },
               "max_instance_request_concurrency": {
                 "type": "integer",
                 "description": "Maximum number of concurrent requests allowed per instance",
-                "errorMessage": "'max_instance_request_concurrency' is required and must be an integer"
+                "errorMessage": "'max_instance_request_concurrency' and must be an integer"
               },
               "available_cpu": {
                 "type": "string",
-                "description": "Number of CPUs allocated to the function. Can be null if unspecified",
+                "description": "Number of CPUs allocated to the function",
                 "errorMessage": "'available_cpu' must be a string if provided or must be omitted"
               },
               "environment_variables": {
@@ -98,12 +98,12 @@
               },
               "vpc_connector": {
                 "type": "string",
-                "description": "VPC connector to use, if applicable. Can be null if not configured",
+                "description": "VPC connector to use, if applicable",
                 "errorMessage": "'vpc_connector' must be a string if provided or must be omitted"
               },
               "vpc_connector_egress_settings": {
                 "type": "string",
-                "description": "Egress settings for the VPC connector. Can be null if unspecified",
+                "description": "Egress settings for the VPC connector",
                 "enum": ["VPC_CONNECTOR_EGRESS_SETTINGS_UNSPECIFIED", "PRIVATE_RANGES_ONLY", "ALL_TRAFFIC"],
                 "errorMessage": "'vpc_connector_egress_settings' must be one of 'VPC_CONNECTOR_EGRESS_SETTINGS_UNSPECIFIED', 'PRIVATE_RANGES_ONLY' or 'ALL_TRAFFIC' if provided or must be omitted"
               },
@@ -115,7 +115,7 @@
               },
               "all_traffic_on_latest_revision": {
                 "type": "boolean",
-                "description": "If true, 100% of traffic is routed to the latest revision. Can be null",
+                "description": "If true, 100% of traffic is routed to the latest revision",
                 "errorMessage": "'all_traffic_on_latest_revision' must be a boolean if provided or must be omitted"
               },
               "secret_environment_variables": {

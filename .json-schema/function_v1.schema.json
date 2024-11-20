@@ -23,7 +23,7 @@
           },
           "source_folder": {
             "type": "string",
-            "description": "Path to the folder containing function code",
+            "description": "Relative path to the folder containing function code",
             "errorMessage": "'source_folder' is a required property and must be a string specifying the function's source folder"
           },
           "description": {
@@ -36,15 +36,16 @@
             "description": "Runtime environment for the function, e.g., python38",
             "errorMessage": "'runtime' is required and must specify the function's runtime as a string"
           },
-          "available_memory_mb": {
-            "type": "integer",
-            "description": "Available memory in MB for the function",
-            "errorMessage": "'available_memory_mb' must be an integer representing the memory in MB if provided or must be omitted"
+          "available_memory": {
+            "type": "string",
+            "description": "Memory allocated to the function, e.g., '128Mi' for 128 MB",
+            "pattern": "^[0-9]+(k|M|G|Mi|Gi)$",
+            "errorMessage": "'available_memory' must be a string specifying memory (e.g., '128Mi') if provided or must be omitted"
           },
           "timeout": {
             "type": "integer",
             "description": "Execution timeout for the function in seconds",
-            "errorMessage": "'timeout' must be an integer representing the execution timeout in seconds if provided or must be omitted"
+            "errorMessage": "'timeout' must be an integer if provided or must be omitted"
           },
           "entry_point": {
             "type": "string",
@@ -64,9 +65,9 @@
           },
           "environment_variables": {
             "type": "object",
-            "description": "Environment variables for the function, defined as key-value pairs",
-            "additionalProperties": { "type": "string" },
-            "errorMessage": "'environment_variables' must be an object with key-value pairs if provided or must be omitted"
+            "description": "Build environment variables for the function, defined as key-value pairs",
+            "additionalProperties": { "type": ["string", "integer", "boolean"] },
+            "errorMessage": "'environment_variables' must be an object with key-value pairs of strings, integers, or booleans if provided or must be omitted"
           },
           "build_environment_variables": {
             "type": "object",
@@ -77,11 +78,11 @@
           "vpc_connector": {
             "type": "string",
             "description": "VPC connector to use, if applicable",
-            "errorMessage": "'vpc_connector' must be a string specifying the VPC connector if provided or must be omitted"
+            "errorMessage": "'vpc_connector' must be a string if provided or must be omitted"
           },
           "vpc_connector_egress_settings": {
                 "type": "string",
-                "description": "Egress settings for the VPC connector. Can be null if unspecified",
+                "description": "Egress settings for the VPC connector",
                 "enum": ["PRIVATE_RANGES_ONLY", "ALL_TRAFFIC"],
                 "errorMessage": "'vpc_connector_egress_settings' must be one of 'PRIVATE_RANGES_ONLY' or 'ALL_TRAFFIC' if provided or must be omitted"
               },
@@ -94,12 +95,12 @@
           "max_instances": {
             "type": "integer",
             "description": "Maximum number of instances allowed for the function",
-            "errorMessage": "'max_instances' must be an integer specifying the maximum number of instances if provided or must be omitted"
+            "errorMessage": "'max_instances' must be an integer if provided or must be omitted"
           },
           "min_instances": {
             "type": "integer",
             "description": "Minimum number of instances to keep warm for the function",
-            "errorMessage": "'min_instances' must be an integer specifying the minimum number of instances if provided or must be omitted"
+            "errorMessage": "'min_instances' must be an integer if provided or must be omitted"
           },
           "event_trigger": {
             "type": "object",

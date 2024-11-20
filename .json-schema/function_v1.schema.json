@@ -40,19 +40,13 @@
             "type": "string",
             "description": "Memory allocated to the function, e.g., '128Mi' for 128 MB",
             "pattern": "^[0-9]+(k|M|G|Mi|Gi)$",
-<<<<<<< Updated upstream
-=======
             "default": 256,
->>>>>>> Stashed changes
             "errorMessage": "'available_memory' must be a string specifying memory (e.g., '128Mi') if provided or must be omitted"
           },
           "timeout": {
             "type": "integer",
             "description": "Execution timeout for the function in seconds",
-<<<<<<< Updated upstream
-=======
             "default": 60,
->>>>>>> Stashed changes
             "errorMessage": "'timeout' must be an integer if provided or must be omitted"
           },
           "entry_point": {

@@ -40,11 +40,19 @@
             "type": "string",
             "description": "Memory allocated to the function, e.g., '128Mi' for 128 MB",
             "pattern": "^[0-9]+(k|M|G|Mi|Gi)$",
+<<<<<<< Updated upstream
+=======
+            "default": 256,
+>>>>>>> Stashed changes
             "errorMessage": "'available_memory' must be a string specifying memory (e.g., '128Mi') if provided or must be omitted"
           },
           "timeout": {
             "type": "integer",
             "description": "Execution timeout for the function in seconds",
+<<<<<<< Updated upstream
+=======
+            "default": 60,
+>>>>>>> Stashed changes
             "errorMessage": "'timeout' must be an integer if provided or must be omitted"
           },
           "entry_point": {
@@ -84,6 +92,7 @@
                 "type": "string",
                 "description": "Egress settings for the VPC connector",
                 "enum": ["PRIVATE_RANGES_ONLY", "ALL_TRAFFIC"],
+                "default": "PRIVATE_RANGES_ONLY",
                 "errorMessage": "'vpc_connector_egress_settings' must be one of 'PRIVATE_RANGES_ONLY' or 'ALL_TRAFFIC' if provided or must be omitted"
               },
           "ingress_settings": {
@@ -123,6 +132,7 @@
                   "retry": {
                     "type": "boolean",
                     "description": "If true, retries event processing upon failure",
+                    "default": false,
                     "errorMessage": "'retry' must be a boolean indicating whether to retry on failure"
                   }
                 },

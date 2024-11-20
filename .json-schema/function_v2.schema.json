@@ -36,10 +36,17 @@
             "description": "Build configuration settings for the function",
             "properties": {
               "runtime": {
+<<<<<<< Updated upstream
             "type": "string",
             "description": "Runtime environment for the function, e.g., python38",
             "errorMessage": "'runtime' is required and must specify the function's runtime as a string"
           },
+=======
+                "type": "string",
+                "description": "Runtime environment for the function, e.g., python38",
+                "errorMessage": "'runtime' is required and must specify the function's runtime as a string"
+              },
+>>>>>>> Stashed changes
               "entry_point": {
                 "type": "string",
                 "description": "Entry point for the function (e.g., main function to execute)",
@@ -62,17 +69,29 @@
               "timeout_seconds": {
                 "type": "integer",
                 "description": "Execution timeout for the function in seconds",
+<<<<<<< Updated upstream
+=======
+                "default": 60,
+>>>>>>> Stashed changes
                 "errorMessage": "'timeout_seconds' must be an integer if provided or must be omitted"
               },
               "available_memory": {
                 "type": "string",
                 "description": "Memory allocated to the function, e.g., '128Mi' for 128 MB",
                 "pattern": "^[0-9]+(k|M|G|Mi|Gi)$",
+<<<<<<< Updated upstream
+=======
+                "default": "256Mi",
+>>>>>>> Stashed changes
                 "errorMessage": "'available_memory' must be a string specifying memory (e.g., '128Mi') if provided or must be omitted"
               },
               "max_instance_request_concurrency": {
                 "type": "integer",
                 "description": "Maximum number of concurrent requests allowed per instance",
+<<<<<<< Updated upstream
+=======
+                "default": 1,
+>>>>>>> Stashed changes
                 "errorMessage": "'max_instance_request_concurrency' and must be an integer"
               },
               "available_cpu": {
@@ -111,11 +130,16 @@
                 "type": "string",
                 "description": "Ingress settings to control traffic access to the function",
                 "enum": ["ALLOW_ALL", "ALLOW_INTERNAL_ONLY", "ALLOW_INTERNAL_AND_GCLB"],
+                "default": "ALLOW_ALL",
                 "errorMessage": "'ingress_settings' must be one of 'ALLOW_ALL', 'ALLOW_INTERNAL_ONLY' or 'ALLOW_INTERNAL_AND_GCLB' if provided or must be omitted"
               },
               "all_traffic_on_latest_revision": {
                 "type": "boolean",
                 "description": "If true, 100% of traffic is routed to the latest revision",
+<<<<<<< Updated upstream
+=======
+                "default": true,
+>>>>>>> Stashed changes
                 "errorMessage": "'all_traffic_on_latest_revision' must be a boolean if provided or must be omitted"
               },
               "secret_environment_variables": {

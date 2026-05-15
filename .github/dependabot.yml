@@ -1,0 +1,27 @@
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # Python dependencies
+  - package-ecosystem: pip
+    directories:
+      - /otel_log_wrapper
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      opentelemetry:
+        patterns:
+          - "opentelemetry-*"

@@ -226,8 +226,13 @@ def _get_source_path_property(confluence: Confluence, page_id: str) -> Optional[
         prop = confluence.get_page_property(page_id, _SOURCE_PATH_PROPERTY_KEY)
         if prop and "value" in prop:
             return prop["value"]
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(
+            "Failed to fetch page property '%s' for page id=%s: %s",
+            _SOURCE_PATH_PROPERTY_KEY,
+            page_id,
+            e,
+        )
     return None
 
 

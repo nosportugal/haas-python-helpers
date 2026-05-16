@@ -51,6 +51,7 @@ from pathlib import Path
 from typing import Optional
 
 from atlassian import Confluence
+
 from .confluence import (
     _find_folder_under_parent,
     _find_page_under_parent,

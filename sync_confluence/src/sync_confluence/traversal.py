@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from atlassian import Confluence
+
 from .confluence import build_source_path_map, upsert_folder, upsert_page
 from .converter import convert_markdown, derive_title
 
@@ -220,20 +221,6 @@ def sync_files(
     skipped: list[str] = []
     stats: dict[str, int] = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0}
 
-    for md_file in files:
-        if not md_file.is_file():
-            log.warning("Skipping non-existent file: %s", md_file)
-            continue
-
-        title = derive_title(md_file, docs_root, None)
-        body = convert_markdown(
-            md_file.read_text(encoding="utf-8"),
-            mermaid_macro=mermaid_macro,
-            repo_url=repo_url,
-            git_ref=git_ref,
-            docs_dir=str(docs_root),
-            current_file=md_file,
-        )
     source_path_map: dict[str, str] = {}
     if not dry_run and parent_id not in ("DRY-RUN",):
         source_path_map = build_source_path_map(confluence, parent_id)

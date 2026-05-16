@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sync-confluence"
+version = "0.1.0"
+description = "Sync a docs/ directory tree to Confluence Cloud as nested pages."
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = [
+    "atlassian-python-api>=3.41.0",
+    "markdown>=3.7",
+]
+
+[project.scripts]
+sync-confluence = "sync_confluence.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sync_confluence"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E203"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[dependency-groups]
+dev = [
+    "pytest>=7",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

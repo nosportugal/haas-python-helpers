@@ -6,8 +6,8 @@ from typing import Optional
 
 from atlassian import Confluence
 
-from sync_confluence.confluence._constants import _Actions, _DRY_RUN_ID, _Keys
-from sync_confluence.confluence._logging import log, _suppress_atlassian_not_found
+from sync_confluence.confluence._constants import _DRY_RUN_ID, _Actions, _Keys
+from sync_confluence.confluence._logging import _suppress_atlassian_not_found, log
 from sync_confluence.confluence._lookup import _find_page_under_parent
 from sync_confluence.confluence._page_metadata import (
     _apply_page_metadata,

@@ -7,7 +7,7 @@ from typing import Optional
 from atlassian import Confluence
 
 from sync_confluence.confluence._constants import _Keys
-from sync_confluence.confluence._logging import log, _suppress_atlassian_not_found
+from sync_confluence.confluence._logging import _suppress_atlassian_not_found, log
 
 
 def _find_page_under_parent(
@@ -35,10 +35,11 @@ def _find_page_under_parent(
     if str(ancestors[-1][_Keys.ID]) != str(parent_id):
         return None
 
+    body_storage = page.get("body", {}).get(_Keys.STORAGE, {})
     return {
         _Keys.ID: str(page[_Keys.ID]),
         _Keys.VERSION: page[_Keys.VERSION][_Keys.NUMBER],
-        "body": page.get("body", {}).get(_Keys.STORAGE, {}).get(_Keys.VALUE, ""),
+        "body": body_storage.get(_Keys.VALUE, ""),
     }
 
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from sync_confluence.confluence import upsert_page
 from sync_confluence.traversal._builder import _collect_md_files
-from sync_confluence.traversal._sync_state import _Sync, _maybe_log
+from sync_confluence.traversal._sync_state import _maybe_log, _Sync
 
 _ICON_FILE = "\U0001f4c4"  # 📄
 

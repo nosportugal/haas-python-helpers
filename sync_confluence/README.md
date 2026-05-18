@@ -160,7 +160,7 @@ Add the following steps to your workflow to sync docs on every push to `main`:
 Required GitHub repository secrets (`Settings → Secrets and variables → Actions`):
 
 | Secret | Value |
-|---|---|
+| --- | --- |
 | `CONFLUENCE_URL` | `https://<tenant>.atlassian.net` |
 | `CONFLUENCE_EMAIL` | Atlassian account email |
 | `CONFLUENCE_API_TOKEN` | API token from id.atlassian.com |
@@ -168,7 +168,7 @@ Required GitHub repository secrets (`Settings → Secrets and variables → Acti
 Required GitHub repository variables (same settings page, `Variables` tab):
 
 | Variable | Value |
-|---|---|
+| --- | --- |
 | `CONFLUENCE_SPACE_KEY` | Target space key (e.g. `DOCS`) |
 | `CONFLUENCE_PARENT_PAGE_ID` | Numeric ID of the pre-existing parent page |
 

@@ -9,8 +9,8 @@ from atlassian import Confluence
 
 from sync_confluence.confluence._constants import (
     _HASH_PROPERTY_KEY,
-    _Keys,
     _SOURCE_PATH_PROPERTY_KEY,
+    _Keys,
 )
 from sync_confluence.confluence._logging import log
 

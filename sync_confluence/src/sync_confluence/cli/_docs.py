@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Optional
 
 from sync_confluence.cli._resolve import (
-    _DocsInfo,
     _SYNC_MODE_FILES,
+    _DocsInfo,
     _resolve_docs_root,
 )
 

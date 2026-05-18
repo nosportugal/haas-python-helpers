@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from sync_confluence.confluence import upsert_folder
-from sync_confluence.traversal._sync_state import _Sync, _maybe_log
+from sync_confluence.traversal._sync_state import _maybe_log, _Sync
 
 _ICON_FOLDER = "\U0001f4c2"  # 📂
 

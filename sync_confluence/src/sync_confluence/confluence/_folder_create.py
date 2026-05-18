@@ -7,10 +7,10 @@ from typing import Optional
 from atlassian import Confluence
 
 from sync_confluence.confluence._constants import (
-    _Actions,
     _DRY_RUN_ID,
-    _Keys,
     _SOURCE_PATH_PROPERTY_KEY,
+    _Actions,
+    _Keys,
 )
 from sync_confluence.confluence._logging import log
 from sync_confluence.confluence._lookup import _find_folder_by_space_cql

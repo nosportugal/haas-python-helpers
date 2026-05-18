@@ -8,7 +8,7 @@ from sync_confluence.traversal._anchor import _anchor
 from sync_confluence.traversal._md_files import _sync_md_files, _sync_one_md_file
 from sync_confluence.traversal._state import SyncContext, SyncResult, log
 from sync_confluence.traversal._subdirs import _create_subfolder
-from sync_confluence.traversal._sync_state import _Sync, _new_state
+from sync_confluence.traversal._sync_state import _new_state, _Sync
 
 
 def _recurse(state: _Sync, parent_id: str, subdir: Path, depth: int) -> None:
@@ -36,9 +36,7 @@ def _walk_directory(
     _walk_subdirs(state, dir_id, directory, child_depth)
 
 
-def _walk_files(
-    state: _Sync, parent_id: str, files: list[Path], depth: int
-) -> None:
+def _walk_files(state: _Sync, parent_id: str, files: list[Path], depth: int) -> None:
     source_path_map = state.builder.build_path_map(parent_id)
     for md_file in files:
         if not md_file.is_file():

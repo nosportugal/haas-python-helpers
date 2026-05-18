@@ -5,9 +5,9 @@ from __future__ import annotations
 from atlassian import Confluence
 
 from sync_confluence.confluence._constants import (
+    _SOURCE_PATH_PROPERTY_KEY,
     _Actions,
     _Keys,
-    _SOURCE_PATH_PROPERTY_KEY,
 )
 from sync_confluence.confluence._folder_create import (
     _create_folder_with_fallback,

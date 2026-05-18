@@ -31,7 +31,8 @@ class TestParseArgs:
         assert args.space == "DOCS"
         assert args.parent_id == "12345"
 
-    def test_defaults(self):
+    def test_defaults(self, monkeypatch):
+        monkeypatch.delenv("GITHUB_REF_NAME", raising=False)
         args = parse_args([])
         assert args.dry_run is False
         assert args.no_root is False

@@ -1,0 +1,39 @@
+name: Validate Python Package
+description: Detects and runs applicable quality checks (ruff lint, ruff format, flake8-WPS, pytest)
+
+inputs:
+  package-dir:
+    description: Path to the package directory relative to the repository root
+    required: true
+  python-version:
+    description: Python version to set up.
+    required: false
+    default: '3.11'
+
+runs:
+  using: composite
+  steps:
+    - name: Detect capabilities
+      id: detect
+      shell: bash
+      run: |
+        # has_tests: tests/ directory contains at least one test_*.py file
+        if find "${{ inputs.package-dir }}/tests" -name "test_*.py" -print -quit 2>/dev/null | grep -q .; then
+          echo "has_tests=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "has_tests=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Run pre-commit hooks
+      uses: pre-commit/action@v3.0.1
+
+    - name: Run Pytest
+      if: steps.detect.outputs.has_tests == 'true'
+      shell: bash
+      working-directory: ${{ inputs.package-dir }}
+      run: pytest

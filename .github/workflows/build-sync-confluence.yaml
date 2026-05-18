@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   validate:
+    name: Validate sync_confluence package
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -22,8 +23,9 @@ jobs:
         python-version: '3.11'
 
   deploy:
-    needs: validate
+    name: Build and release sync_confluence package
     runs-on: ubuntu-latest
+    needs: validate
     steps:
     - name: Checkout code
       uses: actions/checkout@v6

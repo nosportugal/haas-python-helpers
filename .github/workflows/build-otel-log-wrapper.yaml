@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   validate:
+    name: Validate otel_log_wrapper package
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -22,8 +23,9 @@ jobs:
         python-version: '3.x'
 
   deploy:
-    needs: validate
+    name: Build and release otel_log_wrapper package
     runs-on: ubuntu-latest
+    needs: validate
     steps:
     - name: Checkout code
       uses: actions/checkout@v6

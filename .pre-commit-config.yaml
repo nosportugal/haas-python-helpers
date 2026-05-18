@@ -2,6 +2,8 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      - id: pretty-format-json
+        args: [--autofix, --indent=2]
       - id: check-merge-conflict
       - id: check-yaml
       - id: check-toml
@@ -10,6 +12,24 @@ repos:
       - id: check-added-large-files
       - id: no-commit-to-branch
         args: [--branch, main]
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+        args: ["-ignore", "input .client-id. is not defined"]
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+        args: [-c=.yamllint.yaml]
+
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.22.1
+    hooks:
+      - id: markdownlint-cli2
+        args: [--config=.markdownlint.yaml]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.13

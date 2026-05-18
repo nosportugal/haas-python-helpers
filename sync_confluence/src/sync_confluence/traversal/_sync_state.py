@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from sync_confluence.traversal._builder import _RequestBuilder
 from sync_confluence.traversal._state import SyncContext, _SyncRecorder
 
-_DRY_RUN_ID = "DRY-RUN"
 _LOG_INDENT = "  "
 
 

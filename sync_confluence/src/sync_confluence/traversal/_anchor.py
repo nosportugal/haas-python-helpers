@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Optional
 
 from sync_confluence.confluence import upsert_page
-from sync_confluence.traversal._builder import _RequestBuilder
 from sync_confluence.traversal._state import log
 from sync_confluence.traversal._sync_state import _Sync, _maybe_log
 

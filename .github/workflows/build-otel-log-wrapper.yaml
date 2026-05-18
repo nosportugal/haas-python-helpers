@@ -1,6 +1,5 @@
 name: Build otel_log_wrapper
 
-
 on:
   push:
     tags:
@@ -10,10 +9,20 @@ permissions:
   contents: write
 
 jobs:
-  deploy:
-
+  validate:
     runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
 
+    - name: Validate package
+      uses: ./.github/actions/validate-package
+      with:
+        package-dir: otel_log_wrapper
+        python-version: '3.x'
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
 

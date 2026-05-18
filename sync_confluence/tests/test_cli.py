@@ -55,22 +55,6 @@ class TestParseArgs:
 class TestValidateArgs:
     """Tests for validate_args()."""
 
-    def _make_args(self, **overrides):
-        defaults = {
-            "url": "https://acme.atlassian.net",
-            "email": "user@acme.com",
-            "token": "secret",
-            "space": "DOCS",
-            "parent_id": "12345",
-            "no_root": False,
-            "root_parent": None,
-            "root_title": None,
-            "docs_dir": None,
-            "docs_files": None,
-        }
-        defaults.update(overrides)
-        return argparse.Namespace(**defaults)
-
     def test_valid_args_pass(self):
         args = self._make_args()
         # Should not raise or exit
@@ -99,3 +83,19 @@ class TestValidateArgs:
         with pytest.raises(SystemExit) as exc_info:
             validate_args(args)
         assert exc_info.value.code == 2
+
+    def _make_args(self, **overrides):
+        defaults = {
+            "url": "https://acme.atlassian.net",
+            "email": "user@acme.com",
+            "token": "secret",
+            "space": "DOCS",
+            "parent_id": "12345",
+            "no_root": False,
+            "root_parent": None,
+            "root_title": None,
+            "docs_dir": None,
+            "docs_files": None,
+        }
+        defaults.update(overrides)
+        return argparse.Namespace(**defaults)

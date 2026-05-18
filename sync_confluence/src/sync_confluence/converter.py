@@ -62,25 +62,24 @@ def _unescape_code_body(body: str) -> str:
 def _replace_code_block(match: re.Match, mermaid_macro: Optional[str]) -> str:
     """Replace a fenced code block with a Confluence macro."""
     language = match.group(1)
-    code = _unescape_code_body(match.group(2))
+    code_body = _unescape_code_body(match.group(2))
 
     if language == "mermaid" and mermaid_macro:
-        return _CONFLUENCE_MERMAID_MACRO.format(macro=mermaid_macro, code=code)
+        return _CONFLUENCE_MERMAID_MACRO.format(macro=mermaid_macro, code=code_body)
 
-    return _CONFLUENCE_CODE_MACRO.format(language=language, code=code)
+    return _CONFLUENCE_CODE_MACRO.format(language=language, code=code_body)
 
 
 def _replace_bare_code_block(match: re.Match) -> str:
     """Replace a bare code block (no language) with a Confluence macro."""
-    code = _unescape_code_body(match.group(1))
-    return _CONFLUENCE_CODE_MACRO_BARE.format(code=code)
+    code_body = _unescape_code_body(match.group(1))
+    return _CONFLUENCE_CODE_MACRO_BARE.format(code=code_body)
 
 
 def _rewrite_relative_link(
     match: re.Match,
     repo_url: str,
     git_ref: str,
-    docs_dir: str,
     current_file: Path,
 ) -> str:
     """Rewrite a relative .md link to a GitHub blob URL."""
@@ -112,7 +111,6 @@ def convert_markdown(
     mermaid_macro: Optional[str] = None,
     repo_url: Optional[str] = None,
     git_ref: str = "main",
-    docs_dir: str = "docs",
     current_file: Optional[Path] = None,
 ) -> str:
     """Convert Markdown text to Confluence Storage Format (XHTML)."""
@@ -124,7 +122,7 @@ def convert_markdown(
 
     # Post-process: fenced code blocks → Confluence code macros
     body = _CODE_BLOCK_RE.sub(
-        lambda m: _replace_code_block(m, mermaid_macro),
+        lambda match: _replace_code_block(match, mermaid_macro),
         body,
     )
     body = _CODE_BLOCK_BARE_RE.sub(_replace_bare_code_block, body)
@@ -132,13 +130,20 @@ def convert_markdown(
     # Post-process: rewrite relative links to GitHub URLs
     if repo_url and current_file:
         body = _RELATIVE_LINK_RE.sub(
-            lambda m: _rewrite_relative_link(
-                m, repo_url, git_ref, docs_dir, current_file
+            lambda match: _rewrite_relative_link(
+                match, repo_url, git_ref, current_file
             ),
             body,
         )
 
     return body
+
+
+def _extract_h1_or_none(md_path: Path) -> Optional[str]:
+    """Return the first H1 heading text from *md_path*, or ``None``."""
+    file_content = md_path.read_text(encoding="utf-8")
+    h1_match = _H1_RE.search(file_content)
+    return h1_match.group(1).strip() if h1_match else None
 
 
 def derive_title(md_path: Path, docs_root: Path, root_title: Optional[str]) -> str:
@@ -150,25 +155,12 @@ def derive_title(md_path: Path, docs_root: Path, root_title: Optional[str]) -> s
     - Non-README files: extract the first H1; fall back to title-casing the
       file stem when no H1 is present.
     """
-    if md_path.name == "README.md":
-        if md_path.parent == docs_root:
-            if root_title:
-                return root_title
-            # Extract first H1 from the file
-            content = md_path.read_text(encoding="utf-8")
-            m = _H1_RE.search(content)
-            if m:
-                return m.group(1).strip()
-            return "Documentation"
-        # Non-root README: prefer H1, fall back to directory name
-        content = md_path.read_text(encoding="utf-8")
-        m = _H1_RE.search(content)
-        if m:
-            return m.group(1).strip()
-        return md_path.parent.name.replace("-", " ").title()
-    # Non-README files: prefer H1, fall back to file stem
-    content = md_path.read_text(encoding="utf-8")
-    m = _H1_RE.search(content)
-    if m:
-        return m.group(1).strip()
-    return md_path.stem.replace("-", " ").title()
+    is_readme = md_path.name == "README.md"
+    if is_readme and md_path.parent == docs_root:
+        return root_title or _extract_h1_or_none(md_path) or "Documentation"
+    if is_readme:
+        return (
+            _extract_h1_or_none(md_path)
+            or md_path.parent.name.replace("-", " ").title()
+        )
+    return _extract_h1_or_none(md_path) or md_path.stem.replace("-", " ").title()

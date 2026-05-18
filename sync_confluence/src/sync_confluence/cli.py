@@ -47,26 +47,50 @@ import os
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from atlassian import Confluence
 
-from .confluence import (
-    _find_folder_under_parent,
-    _find_page_under_parent,
+from sync_confluence.confluence import (
+    DeleteOrphansRequest,
+    FolderUpsertRequest,
     delete_orphans,
     upsert_folder,
 )
-from .traversal import sync_directory, sync_files
+from sync_confluence.confluence._lookup import (
+    _find_folder_under_parent,
+    _find_page_under_parent,
+)
+from sync_confluence.traversal import (
+    SyncContext,
+    SyncResult,
+    sync_directory,
+    sync_files,
+)
 
 log = logging.getLogger(__name__)
 
 
 def _env(name: str, default: Optional[str] = None) -> Optional[str]:
     """Read an environment variable, returning *default* if unset or empty."""
-    value = os.environ.get(name, "")
-    return value if value else default
+    env_value = os.environ.get(name, "")
+    return env_value if env_value else default
+
+
+def _get_git_remote_url() -> Optional[str]:
+    """Return the normalised HTTPS URL from ``git remote get-url origin``."""
+    remote = subprocess.check_output(
+        ["git", "remote", "get-url", "origin"],
+        stderr=subprocess.DEVNULL,
+        text=True,
+    ).strip()
+    if remote.startswith("git@"):
+        remote = re.sub(r"^git@([^:]+):(.+?)(?:\.git)?$", r"https://\1/\2", remote)
+    else:
+        remote = remote.rstrip("/").removesuffix(".git")
+    return remote or None
 
 
 def _detect_repo_url() -> Optional[str]:
@@ -84,17 +108,7 @@ def _detect_repo_url() -> Optional[str]:
         return f"{server}/{repo}"
 
     try:
-        remote = subprocess.check_output(
-            ["git", "remote", "get-url", "origin"],
-            stderr=subprocess.DEVNULL,
-            text=True,
-        ).strip()
-        # Normalise SSH remote (git@github.com:org/repo.git) to HTTPS
-        if remote.startswith("git@"):
-            remote = re.sub(r"^git@([^:]+):(.+?)(?:\.git)?$", r"https://\1/\2", remote)
-        else:
-            remote = remote.rstrip("/").removesuffix(".git")
-        return remote or None
+        return _get_git_remote_url()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
@@ -106,36 +120,36 @@ def _label_from_repo_url(repo_url: str) -> Optional[str]:
     return f"managed-by-{sanitised}" if sanitised else None
 
 
-def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description="Sync a docs/ tree to Confluence Cloud.",
-    )
-    p.add_argument(
+def _add_connection_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "--url",
         default=_env("CONFLUENCE_URL"),
         help="Confluence base URL (env: CONFLUENCE_URL).",
     )
-    p.add_argument(
+    parser.add_argument(
         "--email",
         default=_env("CONFLUENCE_EMAIL"),
         help="Atlassian account email (env: CONFLUENCE_EMAIL).",
     )
-    p.add_argument(
+    parser.add_argument(
         "--token",
         default=_env("CONFLUENCE_API_TOKEN"),
         help="Atlassian API token (env: CONFLUENCE_API_TOKEN).",
     )
-    p.add_argument(
+    parser.add_argument(
         "--space",
         default=_env("CONFLUENCE_SPACE_KEY"),
         help="Confluence space key (env: CONFLUENCE_SPACE_KEY).",
     )
-    p.add_argument(
+    parser.add_argument(
         "--parent-id",
         default=_env("CONFLUENCE_PARENT_PAGE_ID"),
         help="Numeric ID of the parent page (env: CONFLUENCE_PARENT_PAGE_ID).",
     )
-    p.add_argument(
+
+
+def _add_docs_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "--docs-dir",
         default=_env("DOCS_DIR"),
         help=(
@@ -144,7 +158,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "when not set. Mutually exclusive with --docs-files."
         ),
     )
-    p.add_argument(
+    parser.add_argument(
         "--docs-files",
         nargs="+",
         metavar="FILE",
@@ -153,7 +167,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "the parent. Mutually exclusive with --docs-dir."
         ),
     )
-    p.add_argument(
+    parser.add_argument(
         "--root-title",
         default=_env("CONFLUENCE_ROOT_TITLE"),
         help=(
@@ -161,12 +175,15 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "in docs/README.md (env: CONFLUENCE_ROOT_TITLE)."
         ),
     )
-    p.add_argument(
+
+
+def _add_sync_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "--git-ref",
         default=_env("GITHUB_REF_NAME", "main"),
         help="Git ref used in GitHub link construction (env: GITHUB_REF_NAME).",
     )
-    p.add_argument(
+    parser.add_argument(
         "--mermaid-macro",
         default=_env("CONFLUENCE_MERMAID_MACRO"),
         help=(
@@ -175,12 +192,12 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "(env: CONFLUENCE_MERMAID_MACRO)."
         ),
     )
-    p.add_argument(
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview pages that would be created/updated/deleted.",
     )
-    p.add_argument(
+    parser.add_argument(
         "--no-root",
         action="store_true",
         help=(
@@ -189,7 +206,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "Mutually exclusive with --root-parent and --root-title."
         ),
     )
-    p.add_argument(
+    parser.add_argument(
         "--root-parent",
         default=_env("CONFLUENCE_ROOT_PARENT"),
         help=(
@@ -199,7 +216,10 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "(env: CONFLUENCE_ROOT_PARENT)."
         ),
     )
-    p.add_argument(
+
+
+def _add_meta_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
         "--managed-by",
         default=_env("CONFLUENCE_MANAGED_BY"),
         help=(
@@ -211,24 +231,34 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "(env: CONFLUENCE_MANAGED_BY)"
         ),
     )
-    p.add_argument(
+    parser.add_argument(
         "--log-level",
         default=_env("LOG_LEVEL", "INFO"),
         help="Logging verbosity (env: LOG_LEVEL, default: INFO).",
     )
-    return p.parse_args(argv)
+
+
+def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Sync a docs/ tree to Confluence Cloud.",
+    )
+    _add_connection_args(parser)
+    _add_docs_args(parser)
+    _add_sync_args(parser)
+    _add_meta_args(parser)
+    return parser.parse_args(argv)
 
 
 def validate_args(args: argparse.Namespace) -> None:
     """Exit with code 2 if any required argument is missing."""
     missing = []
-    for attr, label in [
+    for attr, label in (
         ("url", "--url / CONFLUENCE_URL"),
         ("email", "--email / CONFLUENCE_EMAIL"),
         ("token", "--token / CONFLUENCE_API_TOKEN"),
         ("space", "--space / CONFLUENCE_SPACE_KEY"),
         ("parent_id", "--parent-id / CONFLUENCE_PARENT_PAGE_ID"),
-    ]:
+    ):
         if not getattr(args, attr, None):
             missing.append(label)
     if missing:
@@ -236,7 +266,9 @@ def validate_args(args: argparse.Namespace) -> None:
         sys.exit(2)
 
     root_opts = [
-        o for o in ("no_root", "root_parent", "root_title") if getattr(args, o, None)
+        opt_name
+        for opt_name in ("no_root", "root_parent", "root_title")
+        if getattr(args, opt_name, None)
     ]
     if len(root_opts) > 1:
         log.error(
@@ -251,47 +283,133 @@ def validate_args(args: argparse.Namespace) -> None:
 
 
 _DOCS_CANDIDATES = ("docs", "documentation", "doc")
+_DRY_RUN_ID = "DRY-RUN"
+_SYNC_MODE_DIR = "directory"
+_SYNC_MODE_FILES = "files"
 
 
-def run(args: argparse.Namespace) -> int:
-    """Execute the sync.  Returns an exit code (0 = success, 1 = error)."""
-    mode = "DRY-RUN" if args.dry_run else "LIVE"
-    log.info("Confluence: %s", args.url)
-    log.info("Space: %s  |  Parent page: %s", args.space, args.parent_id)
+def _resolve_docs_root(
+    args: argparse.Namespace,
+) -> tuple[Optional[Path], str, list[Path]]:
+    """Determine docs_root, sync_mode and docs_files from args.
 
-    # Determine sync mode and docs root
-    docs_files: list[Path] = []
-    sync_mode = "directory"
+    Returns ``(docs_root, sync_mode, docs_files)`` where *docs_root* is
+    ``None`` when an error message has already been logged and the caller
+    should return 1.
+    """
     if getattr(args, "docs_files", None):
-        docs_files = [Path(f) for f in args.docs_files]
-        docs_root = Path.cwd()
-        sync_mode = "files"
-        log.info("Syncing %d file(s)  |  Mode: %s", len(docs_files), mode)
-    elif args.docs_dir:
+        docs_files = [Path(docs_file_path) for docs_file_path in args.docs_files]
+        return Path.cwd(), _SYNC_MODE_FILES, docs_files
+    if args.docs_dir:
         docs_root = Path(args.docs_dir)
         if not docs_root.is_dir():
             log.error("Docs directory not found: %s", docs_root)
-            return 1
-        log.info("Docs dir: %s  |  Mode: %s", docs_root, mode)
-    else:
-        for _candidate in _DOCS_CANDIDATES:
-            _path = Path(_candidate)
-            if _path.is_dir():
-                docs_root = _path
-                log.info(
-                    "Auto-detected docs directory: %s/  |  Mode: %s",
-                    docs_root,
-                    mode,
-                )
-                break
-        else:
-            log.error(
-                "Could not find a docs directory. Pass --docs-dir or create one of: %s",
-                ", ".join(f"{c}/" for c in _DOCS_CANDIDATES),
-            )
-            return 1
+            return None, _SYNC_MODE_DIR, []
+        return docs_root, _SYNC_MODE_DIR, []
+    for candidate in _DOCS_CANDIDATES:
+        candidate_path = Path(candidate)
+        if candidate_path.is_dir():
+            return candidate_path, _SYNC_MODE_DIR, []
+    log.error(
+        "Could not find a docs directory. Pass --docs-dir or create one of: %s",
+        ", ".join(f"{dir_name}/" for dir_name in _DOCS_CANDIDATES),
+    )
+    return None, _SYNC_MODE_DIR, []
 
-    # Auto-detect repository URL for link rewriting and managed-by label
+
+def _resolve_managed_by_label(
+    args: argparse.Namespace, repo_url: Optional[str]
+) -> Optional[str]:
+    """Resolve the managed-by Confluence label from explicit arg or repo URL."""
+    if args.managed_by:
+        managed_by: Optional[str] = args.managed_by
+        log.info("Managed-by label: %s (explicit)", managed_by)
+        return managed_by
+    if repo_url:
+        managed_by = _label_from_repo_url(repo_url)
+        log.info("Managed-by label: %s (derived from repository name)", managed_by)
+        return managed_by
+    log.warning(
+        "Orphan cleanup will target ALL pages under the parent regardless of origin."
+    )
+    return None
+
+
+@dataclass
+class _DocsInfo:
+    """Resolved docs location and mode."""
+
+    root: Path
+    mode: str
+    files: list[Path]
+
+
+@dataclass
+class _AuthInfo:
+    """Confluence connection plus repository/label metadata."""
+
+    confluence: Confluence
+    repo_url: Optional[str]
+    managed_by_label: Optional[str]
+    restrict_edits_to: str
+
+
+@dataclass
+class _SyncPlan:
+    """Where and how to walk the docs tree."""
+
+    parent_id: str
+    readme_as_parent: bool
+    depth: int
+
+
+def _log_sync_target(
+    sync_mode: str, docs_files: list[Path], docs_root: Path, dry_run: bool
+) -> None:
+    mode_label = _DRY_RUN_ID if dry_run else "LIVE"
+    if sync_mode == _SYNC_MODE_FILES:
+        log.info("Syncing %d file(s)  |  Mode: %s", len(docs_files), mode_label)
+    else:
+        log.info("Docs dir: %s  |  Mode: %s", docs_root, mode_label)
+
+
+def _resolve_docs(args: argparse.Namespace) -> Optional[_DocsInfo]:
+    """Resolve docs location, log the sync target, or return ``None`` on error."""
+    docs_root, sync_mode, docs_files = _resolve_docs_root(args)
+    if docs_root is None:
+        return None
+    _log_sync_target(sync_mode, docs_files, docs_root, args.dry_run)
+    return _DocsInfo(root=docs_root, mode=sync_mode, files=docs_files)
+
+
+def _connect_confluence(args: argparse.Namespace) -> Confluence:
+    return Confluence(
+        url=args.url, username=args.email, password=args.token, cloud=True
+    )
+
+
+def _resolve_restrict_edits_to(
+    confluence: Confluence, args: argparse.Namespace
+) -> Optional[str]:
+    """Return the accountId to restrict edits to (``"DRY-RUN"`` in dry-run)."""
+    user_details = confluence.get("rest/api/user/current")
+    if not user_details or "accountId" not in user_details:
+        log.error(
+            "Could not resolve accountId for '%s'. "
+            "Edit restrictions cannot be applied.",
+            args.email,
+        )
+        return None
+    if args.dry_run:
+        log.info("[DRY-RUN] Would apply edit restrictions (authenticated user)")
+        return _DRY_RUN_ID
+    account_id = user_details["accountId"]
+    log.info("Edit restrictions enabled for accountId=%s", account_id)
+    return account_id
+
+
+def _prepare_auth(args: argparse.Namespace) -> Optional[_AuthInfo]:
+    """Detect repo URL, derive label, connect, resolve account id."""
     repo_url = _detect_repo_url()
     if not repo_url:
         log.warning(
@@ -300,171 +418,176 @@ def run(args: argparse.Namespace) -> int:
             "Relative links will not be rewritten and managed-by label "
             "cannot be auto-derived."
         )
-
-    # Resolve ownership label (explicit > auto-derived from git > None)
-    if args.managed_by:
-        managed_by_label: Optional[str] = args.managed_by
-        log.info("Managed-by label: %s (explicit)", managed_by_label)
-    elif repo_url:
-        managed_by_label = _label_from_repo_url(repo_url)
-        log.info(
-            "Managed-by label: %s (derived from repository name)",
-            managed_by_label,
-        )
-    else:
-        managed_by_label = None
-        log.warning(
-            "Orphan cleanup will target ALL pages under the parent "
-            "regardless of origin."
-        )
-
-    confluence = Confluence(
-        url=args.url,
-        username=args.email,
-        password=args.token,
-        cloud=True,
+    managed_by_label = _resolve_managed_by_label(args, repo_url)
+    confluence = _connect_confluence(args)
+    restrict_edits_to = _resolve_restrict_edits_to(confluence, args)
+    if restrict_edits_to is None:
+        return None
+    return _AuthInfo(
+        confluence=confluence,
+        repo_url=repo_url,
+        managed_by_label=managed_by_label,
+        restrict_edits_to=restrict_edits_to,
     )
-    user_details = confluence.get("rest/api/user/current")
-    if not user_details or "accountId" not in user_details:
-        log.error(
-            "Could not resolve accountId for '%s'. "
-            "Edit restrictions cannot be applied.",
-            args.email,
+
+
+def _find_or_create_root_parent(
+    confluence: Confluence, args: argparse.Namespace, managed_by_label: Optional[str]
+) -> str:
+    existing = _find_folder_under_parent(
+        confluence, args.space, args.root_parent, args.parent_id
+    )
+    if existing is None:
+        existing = _find_page_under_parent(
+            confluence, args.space, args.root_parent, args.parent_id
         )
-        return 1
+    if existing:
+        log.info("Found root parent '%s' (id=%s)", args.root_parent, existing["id"])
+        return existing["id"]
+    folder_id, _ = upsert_folder(
+        confluence,
+        FolderUpsertRequest(
+            space_key=args.space,
+            parent_id=args.parent_id,
+            title=args.root_parent,
+            dry_run=False,
+            managed_by_label=managed_by_label,
+        ),
+    )
+    log.info("Created root parent '%s' (id=%s)", args.root_parent, folder_id)
+    return folder_id
+
+
+def _resolve_root_parent(
+    confluence: Confluence, args: argparse.Namespace, managed_by_label: Optional[str]
+) -> str:
+    log.info(
+        "Searching for root parent '%s' under parent %s",
+        args.root_parent,
+        args.parent_id,
+    )
     if args.dry_run:
-        restrict_edits_to: Optional[str] = "DRY-RUN"
-        log.info("[DRY-RUN] Would apply edit restrictions (authenticated user)")
-    else:
-        restrict_edits_to = user_details["accountId"]
-        log.info("Edit restrictions enabled for accountId=%s", restrict_edits_to)
-
-    # Determine effective parent, sync depth, and readme_as_parent mode
-    effective_parent_id = args.parent_id
-    readme_as_parent = True
-    sync_depth = 0
-
-    if args.no_root:
-        readme_as_parent = False
-    elif args.root_parent:
         log.info(
-            "Searching for root parent '%s' under parent %s",
+            "Would find or create root parent '%s' under parent %s",
             args.root_parent,
             args.parent_id,
         )
-        if args.dry_run:
-            log.info(
-                "Would find or create root parent '%s' under parent %s",
-                args.root_parent,
-                args.parent_id,
-            )
-            effective_parent_id = "DRY-RUN"
-        else:
-            # Try folder first — avoids spurious ERROR from atlassian lib
-            existing: Optional[dict] = _find_folder_under_parent(
-                confluence, args.space, args.root_parent, args.parent_id
-            )
-            if existing is None:
-                existing = _find_page_under_parent(
-                    confluence, args.space, args.root_parent, args.parent_id
-                )
-            if existing:
-                effective_parent_id = existing["id"]
-                log.info(
-                    "Found root parent '%s' (id=%s)",
-                    args.root_parent,
-                    effective_parent_id,
-                )
-            else:
-                # Always create as a Confluence Folder when not found
-                folder_id, _ = upsert_folder(
-                    confluence,
-                    args.space,
-                    args.parent_id,
-                    args.root_parent,
-                    False,
-                    managed_by_label,
-                )
-                effective_parent_id = folder_id
-                log.info(
-                    "Created root parent '%s' (id=%s)",
-                    args.root_parent,
-                    effective_parent_id,
-                )
-        readme_as_parent = False
-        sync_depth = 1
+        return _DRY_RUN_ID
+    return _find_or_create_root_parent(confluence, args, managed_by_label)
 
-    # Sync the docs tree
-    if sync_mode == "files":
-        page_map, expected_titles, expected_paths, skipped, stats = sync_files(
-            confluence,
-            args.space,
-            effective_parent_id,
-            docs_files,
-            docs_root,
-            mermaid_macro=args.mermaid_macro,
-            repo_url=repo_url,
-            git_ref=args.git_ref,
-            dry_run=args.dry_run,
-            depth=sync_depth,
-            managed_by_label=managed_by_label,
-            restrict_edits_to=restrict_edits_to,
-        )
-    else:
-        page_map, expected_titles, expected_paths, skipped, stats = sync_directory(
-            confluence,
-            args.space,
-            effective_parent_id,
-            docs_root,
-            docs_root,
-            root_title=args.root_title,
-            mermaid_macro=args.mermaid_macro,
-            repo_url=repo_url,
-            git_ref=args.git_ref,
-            dry_run=args.dry_run,
-            depth=sync_depth,
-            readme_as_parent=readme_as_parent,
-            managed_by_label=managed_by_label,
-            restrict_edits_to=restrict_edits_to,
-        )
 
-    # Orphan cleanup — runs unconditionally; managed_by_label is the safety guard.
-    deleted = 0
-    if effective_parent_id == "DRY-RUN":
+def _resolve_sync_plan(
+    confluence: Confluence, args: argparse.Namespace, managed_by_label: Optional[str]
+) -> _SyncPlan:
+    """Determine the parent page, depth, and README handling for the walk."""
+    if args.no_root:
+        return _SyncPlan(parent_id=args.parent_id, readme_as_parent=False, depth=0)
+    if not args.root_parent:
+        return _SyncPlan(parent_id=args.parent_id, readme_as_parent=True, depth=0)
+    parent_id = _resolve_root_parent(confluence, args, managed_by_label)
+    return _SyncPlan(parent_id=parent_id, readme_as_parent=False, depth=1)
+
+
+def _build_sync_context(
+    args: argparse.Namespace, docs: _DocsInfo, auth: _AuthInfo
+) -> SyncContext:
+    return SyncContext(
+        confluence=auth.confluence,
+        space_key=args.space,
+        docs_root=docs.root,
+        root_title=args.root_title,
+        mermaid_macro=args.mermaid_macro,
+        repo_url=auth.repo_url,
+        git_ref=args.git_ref,
+        dry_run=args.dry_run,
+        managed_by_label=auth.managed_by_label,
+        restrict_edits_to=auth.restrict_edits_to,
+    )
+
+
+def _dispatch_sync(
+    args: argparse.Namespace, docs: _DocsInfo, auth: _AuthInfo, plan: _SyncPlan
+) -> SyncResult:
+    ctx = _build_sync_context(args, docs, auth)
+    if docs.mode == _SYNC_MODE_FILES:
+        return sync_files(ctx, plan.parent_id, docs.files, depth=plan.depth)
+    return sync_directory(
+        ctx,
+        plan.parent_id,
+        docs.root,
+        depth=plan.depth,
+        readme_as_parent=plan.readme_as_parent,
+    )
+
+
+def _run_orphan_cleanup(
+    auth: _AuthInfo, parent_id: str, sync_result: SyncResult, dry_run: bool
+) -> int:
+    if parent_id == _DRY_RUN_ID:
         log.info("[DRY-RUN] Skipping orphan check — parent page does not exist yet")
-    else:
-        if not managed_by_label:
-            log.warning(
-                "No managed-by label is set — orphan cleanup will target ALL "
-                "unmatched pages under the parent regardless of origin."
-            )
-        deleted = delete_orphans(
-            confluence,
-            effective_parent_id,
-            expected_titles,
-            args.dry_run,
-            managed_by_label,
-            expected_paths,
+        return 0
+    if not auth.managed_by_label:
+        log.warning(
+            "No managed-by label is set — orphan cleanup will target ALL "
+            "unmatched pages under the parent regardless of origin."
         )
+    request = DeleteOrphansRequest(
+        root_page_id=parent_id,
+        expected_titles=sync_result.expected_titles,
+        dry_run=dry_run,
+        managed_by_label=auth.managed_by_label,
+        expected_paths=sync_result.expected_paths,
+    )
+    return delete_orphans(auth.confluence, request)
 
+
+def _log_sync_summary(sync_result: SyncResult, deleted: int) -> None:
     log.info(
         "Sync complete — created: %d, updated: %d, unchanged: %d, "
         "skipped: %d, orphans deleted: %d",
-        stats["created"],
-        stats["updated"],
-        stats["unchanged"],
-        stats["skipped"],
+        sync_result.stats["created"],
+        sync_result.stats["updated"],
+        sync_result.stats["unchanged"],
+        sync_result.stats["skipped"],
         deleted,
     )
-    if skipped:
+    if sync_result.skipped:
         log.warning(
             "%d page(s) skipped due to title collisions with unrelated "
             "Confluence pages — rename the source files to resolve: %s",
-            len(skipped),
-            ", ".join(skipped),
+            len(sync_result.skipped),
+            ", ".join(sync_result.skipped),
         )
 
-    return 1 if skipped else 0
+
+def _finalise_run(
+    sync_result: SyncResult,
+    auth: _AuthInfo,
+    plan: _SyncPlan,
+    args: argparse.Namespace,
+) -> None:
+    deleted = _run_orphan_cleanup(auth, plan.parent_id, sync_result, args.dry_run)
+    _log_sync_summary(sync_result, deleted)
+
+
+def _log_run_header(args: argparse.Namespace) -> None:
+    log.info("Confluence: %s", args.url)
+    log.info("Space: %s  |  Parent page: %s", args.space, args.parent_id)
+
+
+def run(args: argparse.Namespace) -> int:
+    """Execute the sync.  Returns an exit code (0 = success, 1 = error)."""
+    _log_run_header(args)
+    docs = _resolve_docs(args)
+    if docs is None:
+        return 1
+    auth = _prepare_auth(args)
+    if auth is None:
+        return 1
+    plan = _resolve_sync_plan(auth.confluence, args, auth.managed_by_label)
+    sync_result = _dispatch_sync(args, docs, auth, plan)
+    _finalise_run(sync_result, auth, plan, args)
+    return 1 if sync_result.skipped else 0
 
 
 def main() -> None:

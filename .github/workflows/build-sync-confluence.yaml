@@ -13,30 +13,30 @@ jobs:
     name: Validate sync_confluence package
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-    - name: Validate package
-      uses: ./.github/actions/validate-package
-      with:
-        package-dir: sync_confluence
-        python-version: '3.11'
+      - name: Validate package
+        uses: ./.github/actions/validate-package
+        with:
+          package-dir: sync_confluence
+          python-version: '3.11'
 
   deploy:
     name: Build and release sync_confluence package
     runs-on: ubuntu-latest
     needs: validate
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-    - name: Build package
-      uses: ./.github/actions/build-and-release
-      with:
-        package-dir: sync_confluence
-        python-version: '3.11'
+      - name: Build package
+        uses: ./.github/actions/build-and-release
+        with:
+          package-dir: sync_confluence
+          python-version: '3.11'
 
-    - name: Release
-      uses: softprops/action-gh-release@v3
-      with:
-        files: ./sync_confluence/dist/*
+      - name: Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: ./sync_confluence/dist/*

@@ -26,6 +26,7 @@ ENV/
 coverage.xml
 htmlcov/
 nosetests.xml
+results/
 junit*.xml
 
 # Linting / formatting caches

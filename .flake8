@@ -3,3 +3,4 @@ select = WPS
 per-file-ignores =
     */__init__.py: WPS410, WPS412
     sync_confluence/src/sync_confluence/confluence/_constants.py: WPS110, WPS115
+    create_new_rc/tests/*.py: WPS226

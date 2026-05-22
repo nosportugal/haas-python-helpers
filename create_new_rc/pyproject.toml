@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "create-new-rc"
+version = "0.1.0"
+description = "Create a release candidate tag and PR for a service repository."
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+
+[project.scripts]
+create-rc = "create_new_rc.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/create_new_rc"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E203"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[dependency-groups]
+dev = [
+    "pytest>=7",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

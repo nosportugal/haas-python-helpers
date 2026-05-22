@@ -9,8 +9,6 @@ import subprocess
 class GitHubAPIError(Exception):
     """Raised when a gh CLI command fails."""
 
-    pass
-
 
 def gh(*args: str, input_text: str | None = None) -> dict | list | str:
     """Run a gh CLI command and return parsed JSON output.
@@ -26,22 +24,20 @@ def gh(*args: str, input_text: str | None = None) -> dict | list | str:
         GitHubAPIError: If the command returns a non-zero exit code.
     """
     cmd = ["gh", *args]
-    result = subprocess.run(
+    completed = subprocess.run(
         cmd,
         capture_output=True,
         text=True,
         input=input_text,
     )
-    if result.returncode != 0:
-        msg = (
-            f"Command failed: {' '.join(cmd)}\n"
-            f"stderr: {result.stderr.strip()}"
-        )
-        raise GitHubAPIError(msg)
-    if result.stdout.strip():
+    if completed.returncode != 0:
+        cmd_str = " ".join(cmd)
+        stderr_str = completed.stderr.strip()
+        raise GitHubAPIError(f"Command failed: {cmd_str}\nstderr: {stderr_str}")
+    if completed.stdout.strip():
         try:
-            return json.loads(result.stdout)
+            return json.loads(completed.stdout)
         except json.JSONDecodeError:
             # Some gh commands (e.g. pr create) output plain text; return as-is.
-            return result.stdout.strip()
+            return completed.stdout.strip()
     return {}

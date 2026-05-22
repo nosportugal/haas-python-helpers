@@ -5,7 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from sync_confluence.confluence import upsert_page
+from sync_confluence.confluence import upsert_attachment, upsert_page
+from sync_confluence.traversal._images import attachment_content_type
 from sync_confluence.traversal._state import log
 from sync_confluence.traversal._sync_state import _maybe_log, _Sync
 
@@ -15,8 +16,19 @@ _ICON_SECTION = "\U0001f4c1"  # 📁
 def _upsert_readme(
     state: _Sync, parent_id: str, readme: Path, title: str
 ) -> tuple[Optional[str], str]:
-    request = state.builder.build_readme_request(parent_id, readme, title)
-    return upsert_page(state.ctx.confluence, request)
+    page_req = state.builder.build_readme_request(parent_id, readme, title)
+    page_id, action = upsert_page(state.ctx.confluence, page_req.request)
+    if action in ("created", "updated") and page_req.attachments:
+        for filename, raw_bytes in page_req.attachments.items():
+            upsert_attachment(
+                state.ctx.confluence,
+                page_id,  # type: ignore[arg-type]  # page_id is str in non-dry-run
+                filename,
+                raw_bytes,
+                attachment_content_type(filename),
+                dry_run=state.ctx.dry_run,
+            )
+    return page_id, action
 
 
 def _anchor_readme(

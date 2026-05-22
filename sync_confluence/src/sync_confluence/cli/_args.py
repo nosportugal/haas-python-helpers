@@ -85,6 +85,25 @@ def _add_sync_args(parser: argparse.ArgumentParser) -> None:
         ),
     )
     parser.add_argument(
+        "--upload-attachments",
+        action="store_true",
+        default=_env("UPLOAD_ATTACHMENTS", "").lower() in ("1", "true", "yes"),
+        help=(
+            "Upload local PNG/JPEG images and rendered Mermaid diagrams as "
+            "Confluence page attachments.  Requires mmdc for diagram rendering "
+            "(env: UPLOAD_ATTACHMENTS)."
+        ),
+    )
+    parser.add_argument(
+        "--mmdc-path",
+        default=_env("MMDC_PATH"),
+        help=(
+            "Path to the mmdc CLI binary used to render Mermaid diagrams to SVG. "
+            "Auto-detected on PATH when not set.  Only relevant with "
+            "--upload-attachments (env: MMDC_PATH)."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview pages that would be created/updated/deleted.",

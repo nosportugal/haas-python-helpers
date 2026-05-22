@@ -3,10 +3,11 @@ from __future__ import annotations
 from sync_confluence.converter import convert_markdown, derive_title
 
 README_FILENAME = "README.md"
+_MERMAID_MACRO = "mermaid-cloud"
 
 
 class TestConvertMarkdown:
-    """Tests for convert_markdown()."""
+    """Tests for convert_markdown() — core rendering."""
 
     def test_plain_paragraph(self):
         output = convert_markdown("Hello world")
@@ -34,8 +35,8 @@ class TestConvertMarkdown:
 
     def test_mermaid_block_with_macro(self):
         md = "```mermaid\ngraph TD;\n```"
-        output = convert_markdown(md, mermaid_macro="mermaid-cloud")
-        assert 'ac:name="mermaid-cloud"' in output
+        output = convert_markdown(md, mermaid_macro=_MERMAID_MACRO)
+        assert f'ac:name="{_MERMAID_MACRO}"' in output
         assert "graph TD;" in output
 
     def test_table_rendering(self):
@@ -50,6 +51,64 @@ class TestConvertMarkdown:
         # CDATA should contain raw < and >, not &lt; &gt;
         assert "x < 10" in output
         assert "y > 5" in output
+
+
+class TestConvertMarkdownMermaidAttachments:
+    """Tests for convert_markdown() — mermaid attachment handling."""
+
+    def test_attachment_replaces_code_block(self):
+        source = "flowchart LR\n  A --> B\n"
+        md = f"```mermaid\n{source}```"
+        output = convert_markdown(md, mermaid_attachments={source: "mermaid-abc.svg"})
+        assert 'ri:filename="mermaid-abc.svg"' in output
+        assert "ac:structured-macro" not in output
+
+    def test_attachment_beats_macro(self):
+        source = "graph TD;\n"
+        md = f"```mermaid\n{source}```"
+        output = convert_markdown(
+            md,
+            mermaid_macro=_MERMAID_MACRO,
+            mermaid_attachments={source: "mermaid-xyz.svg"},
+        )
+        assert 'ri:filename="mermaid-xyz.svg"' in output
+        assert _MERMAID_MACRO not in output
+
+    def test_falls_to_macro_when_not_in_map(self):
+        source = "graph TD;\n"
+        md = f"```mermaid\n{source}```"
+        # attachment map does not contain this source
+        output = convert_markdown(
+            md,
+            mermaid_macro=_MERMAID_MACRO,
+            mermaid_attachments={"other source\n": "other.svg"},
+        )
+        assert f'ac:name="{_MERMAID_MACRO}"' in output
+
+
+class TestConvertMarkdownImageAttachments:
+    """Tests for convert_markdown() — local image attachment handling."""
+
+    def test_local_image_replaced_in_map(self):
+        md = "Here is ![arch](images/arch.png) diagram."
+        output = convert_markdown(
+            md, image_attachments={"images/arch.png": "images-arch.png"}
+        )
+        assert 'ri:filename="images-arch.png"' in output
+        assert "<img" not in output
+
+    def test_local_image_passthrough_when_not_in_map(self):
+        md = "Here is ![arch](images/arch.png) diagram."
+        output = convert_markdown(md, image_attachments={"other.png": "other.png"})
+        # src not in map — original img tag or link preserved
+        assert 'ri:filename="images-arch.png"' not in output
+
+    def test_external_image_not_replaced(self):
+        md = "![remote](https://example.com/img.png)"
+        output = convert_markdown(
+            md, image_attachments={"https://example.com/img.png": "should-not.png"}
+        )
+        assert 'ri:filename="should-not.png"' not in output
 
 
 class TestDeriveTitle:

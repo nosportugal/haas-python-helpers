@@ -47,6 +47,17 @@ _CONFLUENCE_MERMAID_MACRO = (
     "</ac:structured-macro>"
 )
 
+_CONFLUENCE_IMAGE_ATTACHMENT = (
+    '<ac:image><ri:attachment ri:filename="{filename}"/></ac:image>'
+)
+
+# Regex for <img ... src="relative/path"> tags produced by the markdown library
+# for local image references.  Excludes http/https/# URLs.
+_IMG_SRC_RE = re.compile(
+    r'<img([^>]*?)\bsrc="(?!https?://|#)([^"]+)"([^>]*?)>',
+    re.DOTALL,
+)
+
 # ---------------------------------------------------------------------------
 # Page title derivation
 # ---------------------------------------------------------------------------
@@ -59,13 +70,23 @@ def _unescape_code_body(body: str) -> str:
     return html.unescape(body)
 
 
-def _replace_code_block(match: re.Match, mermaid_macro: Optional[str]) -> str:
-    """Replace a fenced code block with a Confluence macro."""
+def _replace_code_block(
+    match: re.Match,
+    mermaid_macro: Optional[str],
+    mermaid_attachments: Optional[dict[str, str]],
+) -> str:
+    """Replace a fenced code block with a Confluence macro or image attachment."""
     language = match.group(1)
     code_body = _unescape_code_body(match.group(2))
 
-    if language == "mermaid" and mermaid_macro:
-        return _CONFLUENCE_MERMAID_MACRO.format(macro=mermaid_macro, code=code_body)
+    if language == "mermaid":
+        att_filename = (
+            mermaid_attachments.get(code_body) if mermaid_attachments else None
+        )  # noqa: WPS221
+        if att_filename is not None:
+            return _CONFLUENCE_IMAGE_ATTACHMENT.format(filename=att_filename)
+        if mermaid_macro:
+            return _CONFLUENCE_MERMAID_MACRO.format(macro=mermaid_macro, code=code_body)
 
     return _CONFLUENCE_CODE_MACRO.format(language=language, code=code_body)
 
@@ -105,27 +126,64 @@ def _rewrite_relative_link(
     return f'<a href="{github_url}">'
 
 
-def convert_markdown(
+def _replace_local_image(
+    match: re.Match,
+    image_attachments: dict[str, str],
+) -> str:
+    """Replace a local <img src="..."> tag with a Confluence attachment image macro."""
+    src = match.group(2)
+    att_filename = image_attachments.get(src)
+    if att_filename is not None:
+        return _CONFLUENCE_IMAGE_ATTACHMENT.format(filename=att_filename)
+    return match.group(0)
+
+
+def convert_markdown(  # noqa: WPS211 — all params are independent optional features
     text: str,
     *,
     mermaid_macro: Optional[str] = None,
+    mermaid_attachments: Optional[dict[str, str]] = None,
+    image_attachments: Optional[dict[str, str]] = None,
     repo_url: Optional[str] = None,
     git_ref: str = "main",
     current_file: Optional[Path] = None,
 ) -> str:
-    """Convert Markdown text to Confluence Storage Format (XHTML)."""
+    """Convert Markdown text to Confluence Storage Format (XHTML).
+
+    Args:
+        text: Raw Markdown source.
+        mermaid_macro: Confluence macro name for Mermaid diagrams (e.g.
+            ``"mermaid-cloud"``).  Ignored when *mermaid_attachments* maps the
+            same source to an attachment filename.
+        mermaid_attachments: Mapping of unescaped mermaid source body to the
+            attachment filename that holds the rendered SVG.  Takes priority
+            over *mermaid_macro* for matched blocks.
+        image_attachments: Mapping of relative image path (as written in the
+            Markdown) to the attachment filename on the Confluence page.
+        repo_url: GitHub repository URL used to rewrite relative ``.md`` links.
+        git_ref: Git ref used when constructing GitHub blob URLs.
+        current_file: Path of the Markdown file being converted; required for
+            relative-link rewriting.
+    """
     converter = md.Markdown(
         extensions=["tables", "fenced_code", "toc", "md_in_html"],
         output_format="html",
     )
     body = converter.convert(text)
 
-    # Post-process: fenced code blocks → Confluence code macros
+    # Post-process: fenced code blocks → Confluence code macros / image attachments
     body = _CODE_BLOCK_RE.sub(
-        lambda match: _replace_code_block(match, mermaid_macro),
+        lambda match: _replace_code_block(match, mermaid_macro, mermaid_attachments),
         body,
     )
     body = _CODE_BLOCK_BARE_RE.sub(_replace_bare_code_block, body)
+
+    # Post-process: local <img src> tags → Confluence attachment image macros
+    if image_attachments:
+        body = _IMG_SRC_RE.sub(
+            lambda match: _replace_local_image(match, image_attachments),
+            body,
+        )
 
     # Post-process: rewrite relative links to GitHub URLs
     if repo_url and current_file:
@@ -139,13 +197,6 @@ def convert_markdown(
     return body
 
 
-def _extract_h1_or_none(md_path: Path) -> Optional[str]:
-    """Return the first H1 heading text from *md_path*, or ``None``."""
-    file_content = md_path.read_text(encoding="utf-8")
-    h1_match = _H1_RE.search(file_content)
-    return h1_match.group(1).strip() if h1_match else None
-
-
 def derive_title(md_path: Path, docs_root: Path, root_title: Optional[str]) -> str:
     """Derive a Confluence page title from a markdown file path.
 
@@ -155,12 +206,11 @@ def derive_title(md_path: Path, docs_root: Path, root_title: Optional[str]) -> s
     - Non-README files: extract the first H1; fall back to title-casing the
       file stem when no H1 is present.
     """
+    h1_match = _H1_RE.search(md_path.read_text(encoding="utf-8"))
+    h1 = h1_match.group(1).strip() if h1_match else None
     is_readme = md_path.name == "README.md"
     if is_readme and md_path.parent == docs_root:
-        return root_title or _extract_h1_or_none(md_path) or "Documentation"
+        return root_title or h1 or "Documentation"
     if is_readme:
-        return (
-            _extract_h1_or_none(md_path)
-            or md_path.parent.name.replace("-", " ").title()
-        )
-    return _extract_h1_or_none(md_path) or md_path.stem.replace("-", " ").title()
+        return h1 or md_path.parent.name.replace("-", " ").title()
+    return h1 or md_path.stem.replace("-", " ").title()

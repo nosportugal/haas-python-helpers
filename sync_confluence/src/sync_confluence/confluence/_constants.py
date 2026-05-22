@@ -33,3 +33,5 @@ class _Actions:
 _DRY_RUN_ID = "DRY-RUN"
 _HASH_PROPERTY_KEY = "sync_confluence_hash"
 _SOURCE_PATH_PROPERTY_KEY = "sync_confluence_source_path"
+_APPEARANCE_PUBLISHED_KEY = "content-appearance-published"
+_APPEARANCE_DRAFT_KEY = "content-appearance-draft"

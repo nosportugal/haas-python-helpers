@@ -30,6 +30,7 @@ def _build_sync_context(
         dry_run=args.dry_run,
         managed_by_label=auth.managed_by_label,
         restrict_edits_to=auth.restrict_edits_to,
+        page_width=args.page_width,
     )
 
 

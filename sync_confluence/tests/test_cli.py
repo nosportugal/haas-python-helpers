@@ -6,6 +6,8 @@ import pytest
 
 from sync_confluence.cli import parse_args, validate_args
 
+_FULL_WIDTH = "full-width"
+
 
 class TestParseArgs:
     """Tests for parse_args()."""
@@ -52,6 +54,32 @@ class TestParseArgs:
         assert args.no_root is True
 
 
+class TestParseArgsPageWidth:
+    """Tests for --page-width / CONFLUENCE_PAGE_WIDTH in parse_args()."""
+
+    def test_page_width_defaults_to_none(self, monkeypatch):
+        monkeypatch.delenv("CONFLUENCE_PAGE_WIDTH", raising=False)
+        args = parse_args([])
+        assert args.page_width is None
+
+    def test_page_width_flag(self):
+        args = parse_args(["--page-width", _FULL_WIDTH])
+        assert args.page_width == _FULL_WIDTH
+
+    def test_page_width_default_flag(self):
+        args = parse_args(["--page-width", "default"])
+        assert args.page_width == "default"
+
+    def test_page_width_env_var(self, monkeypatch):
+        monkeypatch.setenv("CONFLUENCE_PAGE_WIDTH", _FULL_WIDTH)
+        args = parse_args([])
+        assert args.page_width == _FULL_WIDTH
+
+    def test_page_width_invalid_flag_rejected(self):
+        with pytest.raises(SystemExit):
+            parse_args(["--page-width", "wide"])
+
+
 class TestValidateArgs:
     """Tests for validate_args()."""
 
@@ -84,18 +112,41 @@ class TestValidateArgs:
             validate_args(args)
         assert exc_info.value.code == 2
 
+    def _make_args(self, **overrides: object) -> argparse.Namespace:
+        return _make_args(**overrides)
+
+
+class TestValidateArgsPageWidth:
+    """Tests for page_width validation in validate_args()."""
+
+    def test_invalid_page_width_env_exits(self):
+        with pytest.raises(SystemExit) as exc_info:
+            validate_args(_make_args(page_width="wide"))
+        assert exc_info.value.code == 2
+
+    def test_valid_page_width_passes(self):
+        validate_args(_make_args(page_width=_FULL_WIDTH))
+
+    def test_none_page_width_passes(self):
+        validate_args(_make_args(page_width=None))
+
     def _make_args(self, **overrides):
-        defaults = {
-            "url": "https://acme.atlassian.net",
-            "email": "user@acme.com",
-            "token": "secret",
-            "space": "DOCS",
-            "parent_id": "12345",
-            "no_root": False,
-            "root_parent": None,
-            "root_title": None,
-            "docs_dir": None,
-            "docs_files": None,
-        }
-        defaults.update(overrides)
-        return argparse.Namespace(**defaults)
+        return _make_args(**overrides)
+
+
+def _make_args(**overrides: object) -> argparse.Namespace:
+    defaults = {
+        "url": "https://acme.atlassian.net",
+        "email": "user@acme.com",
+        "token": "secret",
+        "space": "DOCS",
+        "parent_id": "12345",
+        "no_root": False,
+        "root_parent": None,
+        "root_title": None,
+        "docs_dir": None,
+        "docs_files": None,
+        "page_width": None,
+    }
+    defaults.update(overrides)
+    return argparse.Namespace(**defaults)

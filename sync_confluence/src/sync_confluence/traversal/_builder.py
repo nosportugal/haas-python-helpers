@@ -63,6 +63,7 @@ class _RequestBuilder:
             managed_by_label=self._ctx.managed_by_label,
             restrict_edits_to=self._ctx.restrict_edits_to,
             source_path=str(readme.relative_to(self._ctx.docs_root)),
+            page_width=self._ctx.page_width,
         )
 
     def build_page_request(
@@ -82,6 +83,7 @@ class _RequestBuilder:
             restrict_edits_to=self._ctx.restrict_edits_to,
             source_path=str(md_file.relative_to(self._ctx.docs_root)),
             source_path_map=source_path_map,
+            page_width=self._ctx.page_width,
         )
 
     def build_folder_request(

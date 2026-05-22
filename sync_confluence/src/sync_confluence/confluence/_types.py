@@ -19,6 +19,7 @@ class PageUpsertRequest:
     restrict_edits_to: Optional[str] = None
     source_path: Optional[str] = None
     source_path_map: Optional[dict[str, str]] = None
+    page_width: Optional[str] = None
 
 
 @dataclass

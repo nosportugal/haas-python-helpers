@@ -10,6 +10,7 @@ single-module layout):
 - :func:`delete_orphans` — bottom-up cleanup of stale pages and folders.
 """
 
+from sync_confluence.confluence._attachment import upsert_attachment
 from sync_confluence.confluence._cleanup import delete_orphans
 from sync_confluence.confluence._folder_upsert import upsert_folder
 from sync_confluence.confluence._page_upsert import upsert_page
@@ -26,6 +27,7 @@ __all__ = [
     "PageUpsertRequest",
     "build_source_path_map",
     "delete_orphans",
+    "upsert_attachment",
     "upsert_folder",
     "upsert_page",
 ]

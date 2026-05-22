@@ -113,11 +113,44 @@ CLI flags take precedence over environment variables. Required flags must be sup
 - `--managed-by` / `CONFLUENCE_MANAGED_BY`: Label applied to every managed page; only these are eligible for orphan deletion (default: derived from git repository name)
 - `--git-ref` / `GITHUB_REF_NAME`: Git ref used in rewritten GitHub link URLs (default: `main`)
 - `--mermaid-macro` / `CONFLUENCE_MERMAID_MACRO`: Confluence macro name for Mermaid diagrams; omit to render as a plain code block
+- `--upload-attachments` / `UPLOAD_ATTACHMENTS`: Upload local PNG/JPEG images and rendered Mermaid diagrams as Confluence page attachments. Requires `mmdc` for diagram rendering
+- `--mmdc-path` / `MMDC_PATH`: Path to the `mmdc` CLI binary. Auto-detected on `PATH` when not set. Only relevant with `--upload-attachments`
 - `--page-width` / `CONFLUENCE_PAGE_WIDTH`: Set display width for every synced page.
   `full-width` enables wide layout; `default` enforces standard Confluence width.
   Omit to leave page widths unchanged
 - `--dry-run`: Preview pages that would be created, updated, or deleted without making any API calls
 - `--log-level` / `LOG_LEVEL`: Logging verbosity — `DEBUG`, `INFO`, `WARNING`, `ERROR` (default: `INFO`)
+
+## Diagram and image attachment upload
+
+When `--upload-attachments` is set, `sync_confluence` uploads assets directly to
+Confluence pages instead of embedding external references:
+
+- **Mermaid diagrams** — ` ```mermaid ``` ` fenced blocks are rendered to SVG via the
+  `mmdc` CLI and uploaded as page attachments.  The fenced block is replaced with an
+  inline `<ac:image>` referencing the attachment.
+- **Local images** — `![alt](./relative/path.png)` references resolved relative to the
+  Markdown file are uploaded as attachments.  PNG and JPEG files are supported;
+  other formats are skipped with a `DEBUG` log.
+
+### Installing mmdc
+
+```bash
+npm install -g @mermaid-js/mermaid-cli
+```
+
+If `mmdc` is not found on `PATH` at startup, a single `WARNING` is logged and Mermaid
+blocks fall back to plain code blocks for the entire run.  Local image upload is
+unaffected by the availability of `mmdc`.
+
+### Known limitations
+
+- Attachments are only (re-)uploaded when the page action is `created` or `updated`.
+  A page synced before `--upload-attachments` was enabled will not receive attachments
+  until its Markdown source changes.
+- Only PNG and JPEG local images are supported; SVG and other formats are skipped.
+- Changes to attachment byte-content (e.g. a new version of `mmdc` producing different
+  SVG output) are not detected independently of the page body hash.
 
 ## Root page modes
 

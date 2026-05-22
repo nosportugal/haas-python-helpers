@@ -14,11 +14,16 @@ from sync_confluence.traversal import (
     sync_directory,
     sync_files,
 )
+from sync_confluence.traversal._diagrams import find_mmdc
 
 
 def _build_sync_context(
     args: argparse.Namespace, docs: _DocsInfo, auth: _AuthInfo
 ) -> SyncContext:
+    upload_attachments: bool = getattr(args, "upload_attachments", False)
+    mmdc_path = (
+        find_mmdc(getattr(args, "mmdc_path", None)) if upload_attachments else None
+    )
     return SyncContext(
         confluence=auth.confluence,
         space_key=args.space,
@@ -31,6 +36,8 @@ def _build_sync_context(
         managed_by_label=auth.managed_by_label,
         restrict_edits_to=auth.restrict_edits_to,
         page_width=args.page_width,
+        upload_attachments=upload_attachments,
+        mmdc_path=mmdc_path,
     )
 
 

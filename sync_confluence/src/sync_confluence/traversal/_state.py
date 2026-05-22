@@ -39,6 +39,10 @@ class SyncContext:
     managed_by_label: Optional[str] = None
     restrict_edits_to: Optional[str] = None
     page_width: Optional[str] = None
+    upload_attachments: bool = False
+    mmdc_path: Optional[str] = (
+        None  # resolved path to mmdc binary; None disables mermaid rendering
+    )
 
 
 def _new_sync_result() -> SyncResult:

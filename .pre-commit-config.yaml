@@ -29,7 +29,7 @@ repos:
     rev: v0.22.1
     hooks:
       - id: markdownlint-cli2
-        args: [--config=.markdownlint.yaml]
+        args: [--config=.markdownlint.json]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.13

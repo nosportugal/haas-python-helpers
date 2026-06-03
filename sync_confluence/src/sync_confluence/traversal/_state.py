@@ -38,6 +38,7 @@ class SyncContext:
     dry_run: bool = False
     managed_by_label: Optional[str] = None
     restrict_edits_to: Optional[str] = None
+    page_width: Optional[str] = None
 
 
 def _new_sync_result() -> SyncResult:

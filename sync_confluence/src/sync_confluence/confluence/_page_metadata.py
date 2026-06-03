@@ -7,6 +7,8 @@ from typing import Optional
 from atlassian import Confluence
 
 from sync_confluence.confluence._constants import (
+    _APPEARANCE_DRAFT_KEY,
+    _APPEARANCE_PUBLISHED_KEY,
     _HASH_PROPERTY_KEY,
     _SOURCE_PATH_PROPERTY_KEY,
 )
@@ -36,6 +38,21 @@ def _apply_page_metadata(
         _apply_label(confluence, page_id, request.managed_by_label)
     if request.restrict_edits_to:
         _apply_edit_restriction(confluence, page_id, request.restrict_edits_to)
+    if request.page_width is not None:
+        _try_property_set(
+            confluence,
+            page_id,
+            _APPEARANCE_PUBLISHED_KEY,
+            request.page_width,
+            "appearance",
+        )
+        _try_property_set(
+            confluence,
+            page_id,
+            _APPEARANCE_DRAFT_KEY,
+            request.page_width,
+            "appearance",
+        )
 
 
 def _log_dry_run_metadata(request: PageUpsertRequest) -> None:
@@ -51,6 +68,12 @@ def _log_dry_run_metadata(request: PageUpsertRequest) -> None:
             "[DRY-RUN] Would restrict edits on '%s' to accountId=%s",
             request.title,
             request.restrict_edits_to,
+        )
+    if request.page_width is not None:
+        log.debug(
+            "[DRY-RUN] Would set page width on '%s' to '%s'",
+            request.title,
+            request.page_width,
         )
 
 

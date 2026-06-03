@@ -85,9 +85,16 @@ python -m sync_confluence
 
 ### Orphan cleanup (always active)
 
-**⚠️ WARNING: Every sync run PERMANENTLY DELETES Confluence pages under the parent that do not match a source file. This action is IRREVERSIBLE.**
+**⚠️ WARNING: Every sync run PERMANENTLY DELETES Confluence pages under the parent
+that do not match a source file. This action is IRREVERSIBLE.**
 
-Orphan cleanup runs automatically after every sync — there is no opt-in flag. The sync script applies a label (auto-derived from the git repository name, e.g. `managed-by-a3-e2e`) to every page it manages. **Only pages with this label are eligible for deletion.** Override with `--managed-by <label>` or `CONFLUENCE_MANAGED_BY`. If the label cannot be derived and `--managed-by` is not set, all unmatched pages under the parent are at risk.
+Orphan cleanup runs automatically after every sync — there is no opt-in flag.
+The sync script applies a label (auto-derived from the git repository name,
+e.g. `managed-by-a3-e2e`) to every page it manages.
+**Only pages with this label are eligible for deletion.**
+Override with `--managed-by <label>` or `CONFLUENCE_MANAGED_BY`.
+If the label cannot be derived and `--managed-by` is not set,
+all unmatched pages under the parent are at risk.
 
 ## CLI Arguments & Environment Variables
 
@@ -106,6 +113,9 @@ CLI flags take precedence over environment variables. Required flags must be sup
 - `--managed-by` / `CONFLUENCE_MANAGED_BY`: Label applied to every managed page; only these are eligible for orphan deletion (default: derived from git repository name)
 - `--git-ref` / `GITHUB_REF_NAME`: Git ref used in rewritten GitHub link URLs (default: `main`)
 - `--mermaid-macro` / `CONFLUENCE_MERMAID_MACRO`: Confluence macro name for Mermaid diagrams; omit to render as a plain code block
+- `--page-width` / `CONFLUENCE_PAGE_WIDTH`: Set display width for every synced page.
+  `full-width` enables wide layout; `default` enforces standard Confluence width.
+  Omit to leave page widths unchanged
 - `--dry-run`: Preview pages that would be created, updated, or deleted without making any API calls
 - `--log-level` / `LOG_LEVEL`: Logging verbosity — `DEBUG`, `INFO`, `WARNING`, `ERROR` (default: `INFO`)
 

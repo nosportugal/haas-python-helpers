@@ -15,9 +15,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-      - name: Fetch base branch for diff
-        run: git fetch origin ${{ github.base_ref }} --depth=1
+      - name: Compute changed files
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA")
+          all_files=$(echo "$changed" | tr '\n' ' ')
+          echo "all=${all_files}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -25,6 +34,7 @@ jobs:
           python-version: "3.12"
 
       - name: Run pre-commit hooks
+        if: steps.changed.outputs.all != ''
         uses: pre-commit/action@v3.0.1
         with:
-          extra_args: --from-ref origin/${{ github.base_ref }} --to-ref HEAD
+          extra_args: --files ${{ steps.changed.outputs.all }}

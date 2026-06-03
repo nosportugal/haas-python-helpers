@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Optional
 
 from atlassian import Confluence
@@ -39,18 +40,19 @@ def _apply_page_metadata(
     if request.restrict_edits_to:
         _apply_edit_restriction(confluence, page_id, request.restrict_edits_to)
     if request.page_width is not None:
+        appearance_value = json.dumps({"layout": request.page_width})
         _try_property_set(
             confluence,
             page_id,
             _APPEARANCE_PUBLISHED_KEY,
-            request.page_width,
+            appearance_value,
             "appearance",
         )
         _try_property_set(
             confluence,
             page_id,
             _APPEARANCE_DRAFT_KEY,
-            request.page_width,
+            appearance_value,
             "appearance",
         )
 

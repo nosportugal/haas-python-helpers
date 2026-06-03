@@ -131,11 +131,12 @@ def _add_meta_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--page-width",
         default=_env("CONFLUENCE_PAGE_WIDTH"),
-        choices=["full-width", "default"],
+        choices=["full-width", "default", "max"],
         help=(
             "Display width for every synced page. "
             "'full-width' enables wide layout; "
-            "'default' enforces standard Confluence width. "
+            "'default' enforces standard Confluence width; "
+            "'max' enables maximum width layout. "
             "Omit to leave page widths unchanged "
             "(env: CONFLUENCE_PAGE_WIDTH)."
         ),
@@ -184,9 +185,9 @@ def validate_args(args: argparse.Namespace) -> None:
         log.error("--docs-dir and --docs-files are mutually exclusive.")
         sys.exit(2)
 
-    if args.page_width not in (None, "full-width", "default"):
+    if args.page_width not in (None, "full-width", "default", "max"):
         log.error(
-            "Invalid --page-width '%s'; valid values: full-width, default",
+            "Invalid --page-width '%s'; valid values: full-width, default, max",
             args.page_width,
         )
         sys.exit(2)

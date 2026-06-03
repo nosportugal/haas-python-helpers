@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock, patch
 
 from sync_confluence.confluence._constants import (
@@ -41,22 +40,22 @@ class TestApplyPageMetadataAppearance:
     """Tests for appearance property serialization in _apply_page_metadata()."""
 
     @patch(_PATCH_PATH)
-    def test_full_width_stores_json_object(self, mock_set: MagicMock) -> None:
+    def test_full_width_stores_plain_value(self, mock_set: MagicMock) -> None:
         confluence = MagicMock()
         request = _make_request(page_width=_FULL_WIDTH)
         _apply_page_metadata(confluence, _PAGE_ID, request, _BODY_HASH)
         raw_values = _appearance_values(mock_set)
         assert len(raw_values) == 2
-        assert all(json.loads(raw) == {"layout": _FULL_WIDTH} for raw in raw_values)
+        assert all(raw == _FULL_WIDTH for raw in raw_values)
 
     @patch(_PATCH_PATH)
-    def test_default_width_stores_json_object(self, mock_set: MagicMock) -> None:
+    def test_default_width_stores_plain_value(self, mock_set: MagicMock) -> None:
         confluence = MagicMock()
         request = _make_request(page_width=_DEFAULT_WIDTH)
         _apply_page_metadata(confluence, _PAGE_ID, request, _BODY_HASH)
         raw_values = _appearance_values(mock_set)
         assert len(raw_values) == 2
-        assert all(json.loads(raw) == {"layout": _DEFAULT_WIDTH} for raw in raw_values)
+        assert all(raw == _DEFAULT_WIDTH for raw in raw_values)
 
     @patch(_PATCH_PATH)
     def test_both_published_and_draft_keys_set(self, mock_set: MagicMock) -> None:
@@ -75,9 +74,9 @@ class TestApplyPageMetadataAppearance:
         assert _appearance_values(mock_set) == []
 
     @patch(_PATCH_PATH)
-    def test_value_is_not_plain_string(self, mock_set: MagicMock) -> None:
+    def test_value_is_not_json_payload(self, mock_set: MagicMock) -> None:
         confluence = MagicMock()
         request = _make_request(page_width=_FULL_WIDTH)
         _apply_page_metadata(confluence, _PAGE_ID, request, _BODY_HASH)
         for raw in _appearance_values(mock_set):
-            assert raw != _FULL_WIDTH, "value must be JSON, not a plain string"
+            assert not raw.startswith("{"), "value must be plain width, not JSON"

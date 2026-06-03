@@ -11,6 +11,7 @@ from sync_confluence.confluence._logging import _suppress_atlassian_not_found, l
 from sync_confluence.confluence._lookup import _find_page_under_parent
 from sync_confluence.confluence._page_metadata import (
     _apply_page_metadata,
+    _apply_page_width,
     _log_dry_run_metadata,
     _rename_target,
 )
@@ -137,7 +138,14 @@ def _create_new_page(
     )
     page_id = str(page[_Keys.ID])
     log.info("Created: '%s' (id=%s)", request.title, page_id)
-    _apply_page_metadata(confluence, page_id, request, _content_hash(request.body))
+    _apply_page_metadata(
+        confluence,
+        page_id,
+        request,
+        _content_hash(request.body),
+        apply_page_width=False,
+    )
+    _apply_page_width(confluence, page_id, request.page_width)
     return (page_id, _Actions.CREATED)
 
 

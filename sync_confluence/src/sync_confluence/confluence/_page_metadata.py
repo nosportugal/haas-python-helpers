@@ -23,8 +23,9 @@ def _apply_page_metadata(
     page_id: str,
     request: PageUpsertRequest,
     body_hash: str,
+    apply_page_width: bool = True,
 ) -> None:
-    """Apply hash + source-path properties, label and edit restriction."""
+    """Apply hash + source-path properties, label, restrictions and width."""
     _try_property_set(confluence, page_id, _HASH_PROPERTY_KEY, body_hash, "hash")
     if request.source_path is not None:
         _try_property_set(
@@ -38,21 +39,30 @@ def _apply_page_metadata(
         _apply_label(confluence, page_id, request.managed_by_label)
     if request.restrict_edits_to:
         _apply_edit_restriction(confluence, page_id, request.restrict_edits_to)
-    if request.page_width is not None:
-        _try_property_set(
-            confluence,
-            page_id,
-            _APPEARANCE_PUBLISHED_KEY,
-            request.page_width,
-            "appearance",
-        )
-        _try_property_set(
-            confluence,
-            page_id,
-            _APPEARANCE_DRAFT_KEY,
-            request.page_width,
-            "appearance",
-        )
+    if apply_page_width:
+        _apply_page_width(confluence, page_id, request.page_width)
+
+
+def _apply_page_width(
+    confluence: Confluence, page_id: str, page_width: Optional[str]
+) -> None:
+    """Apply published+draft appearance properties when width is requested."""
+    if page_width is None:
+        return
+    _try_property_set(
+        confluence,
+        page_id,
+        _APPEARANCE_PUBLISHED_KEY,
+        page_width,
+        "appearance",
+    )
+    _try_property_set(
+        confluence,
+        page_id,
+        _APPEARANCE_DRAFT_KEY,
+        page_width,
+        "appearance",
+    )
 
 
 def _log_dry_run_metadata(request: PageUpsertRequest) -> None:

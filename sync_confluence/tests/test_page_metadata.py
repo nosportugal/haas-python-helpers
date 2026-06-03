@@ -6,7 +6,10 @@ from sync_confluence.confluence._constants import (
     _APPEARANCE_DRAFT_KEY,
     _APPEARANCE_PUBLISHED_KEY,
 )
-from sync_confluence.confluence._page_metadata import _apply_page_metadata
+from sync_confluence.confluence._page_metadata import (
+    _apply_page_metadata,
+    _apply_page_width,
+)
 from sync_confluence.confluence._types import PageUpsertRequest
 
 _PATCH_PATH = "sync_confluence.confluence._page_metadata._try_property_set"
@@ -80,3 +83,32 @@ class TestApplyPageMetadataAppearance:
         _apply_page_metadata(confluence, _PAGE_ID, request, _BODY_HASH)
         for raw in _appearance_values(mock_set):
             assert not raw.startswith("{"), "value must be plain width, not JSON"
+
+    @patch(_PATCH_PATH)
+    def test_apply_page_width_false_omits_appearance(self, mock_set: MagicMock) -> None:
+        confluence = MagicMock()
+        request = _make_request(page_width=_FULL_WIDTH)
+        _apply_page_metadata(
+            confluence,
+            _PAGE_ID,
+            request,
+            _BODY_HASH,
+            apply_page_width=False,
+        )
+        assert _appearance_values(mock_set) == []
+
+
+class TestApplyPageWidth:
+    """Tests for dedicated page width post-create application helper."""
+
+    @patch(_PATCH_PATH)
+    def test_none_width_does_nothing(self, mock_set: MagicMock) -> None:
+        _apply_page_width(MagicMock(), _PAGE_ID, None)
+        assert mock_set.call_count == 0
+
+    @patch(_PATCH_PATH)
+    def test_width_sets_published_and_draft(self, mock_set: MagicMock) -> None:
+        _apply_page_width(MagicMock(), _PAGE_ID, _FULL_WIDTH)
+        keys_set = {called.args[2] for called in mock_set.call_args_list}
+        assert _APPEARANCE_PUBLISHED_KEY in keys_set
+        assert _APPEARANCE_DRAFT_KEY in keys_set

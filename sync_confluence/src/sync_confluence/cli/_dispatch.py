@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 from sync_confluence.cli._auth import _AuthInfo
 from sync_confluence.cli._docs import _DocsInfo
@@ -11,9 +12,16 @@ from sync_confluence.cli._resolve import _SYNC_MODE_FILES
 from sync_confluence.traversal import (
     SyncContext,
     SyncResult,
+    build_doc_index,
     sync_directory,
     sync_files,
 )
+
+
+def _collect_index_files(docs: _DocsInfo) -> list[Path]:
+    if docs.mode == _SYNC_MODE_FILES:
+        return docs.files
+    return sorted(docs.root.rglob("*.md"))
 
 
 def _build_sync_context(
@@ -31,6 +39,10 @@ def _build_sync_context(
         managed_by_label=auth.managed_by_label,
         restrict_edits_to=auth.restrict_edits_to,
         page_width=args.page_width,
+        doc_index=build_doc_index(
+            docs.root, args.root_title, _collect_index_files(docs)
+        ),
+        generated_by="" if args.no_generated_by else args.generated_by,
     )
 
 

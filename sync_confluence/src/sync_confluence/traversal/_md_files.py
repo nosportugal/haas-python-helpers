@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from sync_confluence.confluence import upsert_page
+from sync_confluence.converter import ConversionError
 from sync_confluence.traversal._builder import _collect_md_files
+from sync_confluence.traversal._state import log
 from sync_confluence.traversal._sync_state import _maybe_log, _Sync
 
 _ICON_FILE = "\U0001f4c4"  # 📄
@@ -19,9 +21,13 @@ def _sync_one_md_file(
     depth: int,
 ) -> None:
     title = state.builder.resolve_md_title(md_file)
-    request = state.builder.build_page_request(
-        parent_id, md_file, title, source_path_map
-    )
+    try:
+        request = state.builder.build_page_request(
+            parent_id, md_file, title, source_path_map
+        )
+    except ConversionError as exc:
+        log.warning("Skipping %s: conversion failed (%s)", md_file, exc)
+        return
     page_id, action = upsert_page(state.ctx.confluence, request)
     _maybe_log(state.ctx.dry_run, depth, _ICON_FILE, title)
     state.recorder.record_page(md_file, title, page_id, action)

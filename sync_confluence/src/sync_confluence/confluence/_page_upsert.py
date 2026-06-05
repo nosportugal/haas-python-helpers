@@ -6,6 +6,7 @@ from typing import Optional
 
 from atlassian import Confluence
 
+from sync_confluence.confluence._attachments import upload_attachments
 from sync_confluence.confluence._constants import _DRY_RUN_ID, _Actions, _Keys
 from sync_confluence.confluence._logging import _suppress_atlassian_not_found, log
 from sync_confluence.confluence._lookup import _find_page_under_parent
@@ -20,6 +21,16 @@ from sync_confluence.confluence._properties import (
     _fetch_hash_prop_value,
 )
 from sync_confluence.confluence._types import PageUpsertRequest
+
+
+def _apply_attachments(
+    confluence: Confluence, page_id: str, request: PageUpsertRequest
+) -> None:
+    """Upload (and reconcile) the request's attachments, if any."""
+    if request.attachments:
+        upload_attachments(
+            confluence, page_id, request.attachments, dry_run=request.dry_run
+        )
 
 
 def _upsert_page_dry_run(
@@ -63,6 +74,7 @@ def _handle_page_rename(
         minor_edit=True,
     )
     _apply_page_metadata(confluence, rename_id, request, _content_hash(request.body))
+    _apply_attachments(confluence, rename_id, request)
     return (rename_id, _Actions.UPDATED)
 
 
@@ -122,6 +134,7 @@ def _update_existing_page(
     )
     log.info("Updated: '%s' (id=%s)", request.title, existing_id)
     _apply_page_metadata(confluence, existing_id, request, body_hash)
+    _apply_attachments(confluence, existing_id, request)
     return (existing_id, _Actions.UPDATED)
 
 
@@ -146,6 +159,7 @@ def _create_new_page(
         apply_page_width=False,
     )
     _apply_page_width(confluence, page_id, request.page_width)
+    _apply_attachments(confluence, page_id, request)
     return (page_id, _Actions.CREATED)
 
 

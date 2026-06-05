@@ -9,7 +9,14 @@ from sync_confluence.confluence import (
     PageUpsertRequest,
     build_source_path_map,
 )
-from sync_confluence.converter import convert_markdown, derive_title
+from sync_confluence.converter import (
+    ConversionResult,
+    ConverterOptions,
+    RepoContext,
+    SourcePaths,
+    convert_markdown,
+    derive_title,
+)
 from sync_confluence.traversal._state import SyncContext
 
 _DRY_RUN_ID = "DRY-RUN"
@@ -37,14 +44,15 @@ class _RequestBuilder:
         self._ctx = ctx
         self._allow_root_title = allow_root_title
 
-    def render(self, md_file: Path) -> str:
-        return convert_markdown(
-            md_file.read_text(encoding="utf-8"),
+    def render(self, md_file: Path) -> ConversionResult:
+        options = ConverterOptions(
+            paths=SourcePaths(current_file=md_file, docs_root=self._ctx.docs_root),
+            repo=RepoContext(repo_url=self._ctx.repo_url, git_ref=self._ctx.git_ref),
+            doc_index=self._ctx.doc_index,
             mermaid_macro=self._ctx.mermaid_macro,
-            repo_url=self._ctx.repo_url,
-            git_ref=self._ctx.git_ref,
-            current_file=md_file,
+            generated_by=self._ctx.generated_by,
         )
+        return convert_markdown(md_file.read_text(encoding="utf-8"), options)
 
     def resolve_md_title(self, md_file: Path) -> str:
         if self._allow_root_title and md_file.name == "README.md":
@@ -54,16 +62,18 @@ class _RequestBuilder:
     def build_readme_request(
         self, parent_id: str, readme: Path, title: str
     ) -> PageUpsertRequest:
+        rendered = self.render(readme)
         return PageUpsertRequest(
             space_key=self._ctx.space_key,
             parent_id=parent_id,
             title=title,
-            body=self.render(readme),
+            body=rendered.body,
             dry_run=self._ctx.dry_run,
             managed_by_label=self._ctx.managed_by_label,
             restrict_edits_to=self._ctx.restrict_edits_to,
             source_path=str(readme.relative_to(self._ctx.docs_root)),
             page_width=self._ctx.page_width,
+            attachments=rendered.attachments,
         )
 
     def build_page_request(
@@ -73,17 +83,19 @@ class _RequestBuilder:
         title: str,
         source_path_map: dict[str, str],
     ) -> PageUpsertRequest:
+        rendered = self.render(md_file)
         return PageUpsertRequest(
             space_key=self._ctx.space_key,
             parent_id=parent_id,
             title=title,
-            body=self.render(md_file),
+            body=rendered.body,
             dry_run=self._ctx.dry_run,
             managed_by_label=self._ctx.managed_by_label,
             restrict_edits_to=self._ctx.restrict_edits_to,
             source_path=str(md_file.relative_to(self._ctx.docs_root)),
             source_path_map=source_path_map,
             page_width=self._ctx.page_width,
+            attachments=rendered.attachments,
         )
 
     def build_folder_request(

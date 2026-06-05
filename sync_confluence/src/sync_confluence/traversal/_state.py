@@ -39,6 +39,8 @@ class SyncContext:
     managed_by_label: Optional[str] = None
     restrict_edits_to: Optional[str] = None
     page_width: Optional[str] = None
+    doc_index: Optional[dict[Path, str]] = None
+    generated_by: Optional[str] = None
 
 
 def _new_sync_result() -> SyncResult:

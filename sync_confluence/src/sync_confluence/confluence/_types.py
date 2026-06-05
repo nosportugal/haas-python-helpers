@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
+
+from sync_confluence.converter import Attachment
 
 
 @dataclass
@@ -20,6 +22,7 @@ class PageUpsertRequest:
     source_path: Optional[str] = None
     source_path_map: Optional[dict[str, str]] = None
     page_width: Optional[str] = None
+    attachments: list[Attachment] = field(default_factory=list)
 
 
 @dataclass

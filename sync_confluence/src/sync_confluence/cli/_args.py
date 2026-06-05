@@ -141,6 +141,21 @@ def _add_meta_args(parser: argparse.ArgumentParser) -> None:
             "(env: CONFLUENCE_PAGE_WIDTH)."
         ),
     )
+    parser.add_argument(
+        "--generated-by",
+        default=_env("CONFLUENCE_GENERATED_BY"),
+        help=(
+            "Banner text prepended to every page as an info panel. Supports "
+            "%%{filepath}, %%{filename}, %%{filedir} and %%{filestem} "
+            "placeholders. Defaults to a standard auto-generated notice "
+            "(env: CONFLUENCE_GENERATED_BY)."
+        ),
+    )
+    parser.add_argument(
+        "--no-generated-by",
+        action="store_true",
+        help="Do not prepend the auto-generated banner to pages.",
+    )
 
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:

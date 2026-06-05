@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from sync_confluence.confluence import upsert_page
+from sync_confluence.converter import ConversionError
 from sync_confluence.traversal._state import log
 from sync_confluence.traversal._sync_state import _maybe_log, _Sync
 
@@ -25,7 +26,11 @@ def _anchor_readme(
     from sync_confluence.converter import derive_title
 
     title = derive_title(readme, state.ctx.docs_root, state.ctx.root_title)
-    page_id, action = _upsert_readme(state, parent_id, readme, title)
+    try:
+        page_id, action = _upsert_readme(state, parent_id, readme, title)
+    except ConversionError as exc:
+        log.warning("Skipping anchor README %s: conversion failed (%s)", readme, exc)
+        return parent_id, depth
     _maybe_log(state.ctx.dry_run, depth, _ICON_SECTION, title)
     if state.recorder.record_page(readme, title, page_id, action):
         return page_id, depth + 1  # type: ignore[return-value]

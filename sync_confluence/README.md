@@ -4,13 +4,17 @@ Syncs a `docs/` directory tree (or a flat list of Markdown files) to Confluence 
 
 - Subdirectories are mirrored as native Confluence Folders under a configured parent page.
 - The root `README.md` becomes the section parent page; all other `.md` files (including `README.md` in subfolders) become regular child pages under their respective folder.
-- Markdown is converted to Confluence Storage Format with fenced-code macros, optional Mermaid macro support, and relative-link rewriting to GitHub blob URLs.
+- Markdown is converted to Confluence Storage Format via an lxml pipeline: fenced-code and Mermaid macros, native `ac:link` cross-references, uploaded image attachments, admonitions, task lists, collapsible sections, table-of-contents, emoji and super/subscript.
 - Content-hash comparison prevents no-op updates, and an optional orphan-cleanup pass deletes pages with no matching source file.
 
 ## Features
 
 - CLI tool for one-way sync of Markdown docs to Confluence Cloud
 - Folder mirroring, fenced-code block and Mermaid macro support
+- Native internal links: relative `.md` links become `ac:link` page references (preserving `#anchors`); out-of-scope links fall back to GitHub blob URLs
+- Image upload: local images are attached to the page and referenced via `ac:image`
+- Rich Markdown: admonitions and GitHub alerts (`> [!NOTE]`) become info/tip/note/warning panels; task lists, collapsible `<details>` (expand macro), `[TOC]`/`[[_TOC_]]`, emoji and super/subscript are supported
+- Generated-by banner: an info panel is prepended to every page (customizable or suppressible)
 - Orphan cleanup with label-based page management — only pages tagged with the managed-by label are eligible for deletion
 - Rename detection: renames existing pages in place instead of creating duplicates
 - Page edit restrictions: synced pages are set to read-only for everyone except the syncing account
@@ -113,6 +117,8 @@ CLI flags take precedence over environment variables. Required flags must be sup
 - `--managed-by` / `CONFLUENCE_MANAGED_BY`: Label applied to every managed page; only these are eligible for orphan deletion (default: derived from git repository name)
 - `--git-ref` / `GITHUB_REF_NAME`: Git ref used in rewritten GitHub link URLs (default: `main`)
 - `--mermaid-macro` / `CONFLUENCE_MERMAID_MACRO`: Confluence macro name for Mermaid diagrams; omit to render as a plain code block
+- `--generated-by` / `CONFLUENCE_GENERATED_BY`: Banner text prepended to every page as an info panel. Supports `%{filepath}`, `%{filename}`, `%{filedir}`, `%{filestem}` placeholders. Defaults to a standard auto-generated notice
+- `--no-generated-by`: Suppress the auto-generated banner panel
 - `--page-width` / `CONFLUENCE_PAGE_WIDTH`: Set display width for every synced page.
   `full-width` enables wide layout; `default` enforces standard Confluence width.
   Omit to leave page widths unchanged

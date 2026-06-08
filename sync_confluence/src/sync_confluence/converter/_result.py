@@ -26,8 +26,8 @@ class RenderedImage:
 class MermaidRenderer(Protocol):
     """Callable that converts Mermaid source to a :class:`RenderedImage`."""
 
-    def __call__(self, source: str) -> Optional[RenderedImage]:  # noqa: WPS612
-        ...
+    def __call__(self, source: str) -> Optional[RenderedImage]:  # noqa: WPS612, WPS324
+        return None  # noqa: WPS324
 
 
 @dataclass(frozen=True)

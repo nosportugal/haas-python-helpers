@@ -41,7 +41,8 @@ class _FakeRenderer:
 class _FailingRenderer:
     """Fake renderer that always returns None."""
 
-    def __call__(self, source: str) -> None: ...
+    def __call__(self, source: str) -> RenderedImage | None:  # noqa: WPS324
+        return None  # noqa: WPS324
 
 
 def _convert(options: ConverterOptions) -> str:

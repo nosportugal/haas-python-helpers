@@ -117,6 +117,9 @@ CLI flags take precedence over environment variables. Required flags must be sup
 - `--managed-by` / `CONFLUENCE_MANAGED_BY`: Label applied to every managed page; only these are eligible for orphan deletion (default: derived from git repository name)
 - `--git-ref` / `GITHUB_REF_NAME`: Git ref used in rewritten GitHub link URLs (default: `main`)
 - `--mermaid-macro` / `CONFLUENCE_MERMAID_MACRO`: Confluence macro name for Mermaid diagrams; omit to render as a plain code block
+- `--render-mermaid` / `RENDER_MERMAID`: Render fenced Mermaid code blocks to PNG via `mmdc` and attach them as Confluence images. Off by default. Skipped in `--dry-run` (the fallback is previewed instead)
+- `--mmdc-path` / `MMDC_PATH`: Path to the `mmdc` binary. Defaults to `mmdc` found on `$PATH`
+- `--mmdc-args` / `MMDC_ARGS`: Extra arguments passed to `mmdc` as a whitespace-separated string. Use `--mmdc-args "--no-sandbox"` when running as root inside Docker or CI containers
 - `--generated-by` / `CONFLUENCE_GENERATED_BY`: Banner text prepended to every page as an info panel. Supports `%{filepath}`, `%{filename}`, `%{filedir}`, `%{filestem}` placeholders. Defaults to a standard auto-generated notice
 - `--no-generated-by`: Suppress the auto-generated banner panel
 - `--page-width` / `CONFLUENCE_PAGE_WIDTH`: Set display width for every synced page.

@@ -51,6 +51,7 @@ class _RequestBuilder:
             doc_index=self._ctx.doc_index,
             mermaid_macro=self._ctx.mermaid_macro,
             generated_by=self._ctx.generated_by,
+            mermaid_renderer=self._ctx.mermaid_renderer,
         )
         return convert_markdown(md_file.read_text(encoding="utf-8"), options)
 

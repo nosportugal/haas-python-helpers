@@ -4,7 +4,30 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Protocol
+
+
+@dataclass(frozen=True)
+class RenderedImage:
+    """The output of a successful Mermaid-to-PNG render.
+
+    *name* is the attachment filename (content-hash based); *raw_bytes* are the
+    raw PNG bytes; *content_type* is ``"image/png"``; *width* and *height* are
+    pixel dimensions extracted from the IHDR chunk (``None`` when unreadable).
+    """
+
+    name: str
+    raw_bytes: bytes
+    content_type: str
+    width: Optional[int]
+    height: Optional[int]
+
+
+class MermaidRenderer(Protocol):
+    """Callable that converts Mermaid source to a :class:`RenderedImage`."""
+
+    def __call__(self, source: str) -> Optional[RenderedImage]:  # noqa: WPS612
+        ...
 
 
 @dataclass(frozen=True)
@@ -40,6 +63,8 @@ class ConverterOptions:
     references instead of GitHub URLs.  *generated_by* is the rendered text of
     the auto-generated banner (``None`` omits it).  *force_valid_language*
     drops unknown code-block language tags when ``True``.
+    *mermaid_renderer* is an optional callable that converts Mermaid source to
+    a PNG attachment; when ``None`` the macro / code-block fallback is used.
     """
 
     paths: SourcePaths = field(default_factory=SourcePaths)
@@ -48,18 +73,25 @@ class ConverterOptions:
     mermaid_macro: Optional[str] = None
     generated_by: Optional[str] = None
     force_valid_language: bool = True
+    mermaid_renderer: Optional[MermaidRenderer] = None
 
 
 @dataclass(frozen=True)
 class Attachment:
-    """A local file to upload alongside a page.
+    """A file to upload alongside a page.
 
-    *path* is the absolute source path; *name* is the flattened attachment
-    filename used both for the ``ri:filename`` reference and the upload.
+    For local images *path* is the absolute source path; *name* is the
+    flattened attachment filename used for the ``ri:filename`` reference and
+    the upload.
+
+    For rendered diagrams (e.g. Mermaid PNG) *path* is ``None`` and
+    *raw_bytes* / *content_type* carry the in-memory payload.
     """
 
-    path: Path
     name: str
+    path: Optional[Path] = None
+    raw_bytes: Optional[bytes] = None
+    content_type: Optional[str] = None
 
 
 @dataclass

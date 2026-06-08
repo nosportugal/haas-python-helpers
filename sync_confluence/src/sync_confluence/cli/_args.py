@@ -11,6 +11,8 @@ from sync_confluence.cli._env import _env
 
 log = logging.getLogger(__name__)
 
+_STORE_TRUE = "store_true"
+
 
 def _add_connection_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
@@ -85,13 +87,39 @@ def _add_sync_args(parser: argparse.ArgumentParser) -> None:
         ),
     )
     parser.add_argument(
+        "--render-mermaid",
+        action=_STORE_TRUE,
+        default=bool(_env("RENDER_MERMAID")),
+        help=(
+            "Render fenced Mermaid code blocks to PNG via mmdc and attach "
+            "them as Confluence images (env: RENDER_MERMAID)."
+        ),
+    )
+    parser.add_argument(
+        "--mmdc-path",
+        default=_env("MMDC_PATH"),
+        help=(
+            "Path to the mmdc binary.  Defaults to 'mmdc' found on $PATH "
+            "(env: MMDC_PATH)."
+        ),
+    )
+    parser.add_argument(
+        "--mmdc-args",
+        default=_env("MMDC_ARGS"),
+        help=(
+            "Extra arguments passed to mmdc, as a whitespace-separated "
+            "string (e.g. '--no-sandbox' for Docker/CI root containers) "
+            "(env: MMDC_ARGS)."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
-        action="store_true",
+        action=_STORE_TRUE,
         help="Preview pages that would be created/updated/deleted.",
     )
     parser.add_argument(
         "--no-root",
-        action="store_true",
+        action=_STORE_TRUE,
         help=(
             "Sync all docs directly under --parent-id without creating an "
             "intermediate root page from docs/README.md. "
@@ -153,7 +181,7 @@ def _add_meta_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--no-generated-by",
-        action="store_true",
+        action=_STORE_TRUE,
         help="Do not prepend the auto-generated banner to pages.",
     )
 

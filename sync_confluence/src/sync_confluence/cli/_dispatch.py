@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import logging
+import shlex
 from pathlib import Path
 
 from sync_confluence.cli._auth import _AuthInfo
@@ -16,6 +18,9 @@ from sync_confluence.traversal import (
     sync_directory,
     sync_files,
 )
+from sync_confluence.traversal._diagrams import find_mmdc, make_mermaid_renderer
+
+log = logging.getLogger(__name__)
 
 
 def _collect_index_files(docs: _DocsInfo) -> list[Path]:
@@ -27,6 +32,13 @@ def _collect_index_files(docs: _DocsInfo) -> list[Path]:
 def _build_sync_context(
     args: argparse.Namespace, docs: _DocsInfo, auth: _AuthInfo
 ) -> SyncContext:
+    render = getattr(args, "render_mermaid", False) and not args.dry_run
+    mmdc = find_mmdc(getattr(args, "mmdc_path", None)) if render else None
+    if render and mmdc is None:
+        log.warning("Mermaid rendering requested but mmdc not found; falling back")
+    mmdc_args_str = getattr(args, "mmdc_args", None)
+    extra_args = tuple(shlex.split(mmdc_args_str)) if mmdc_args_str else ()
+    renderer = make_mermaid_renderer(mmdc, extra_args) if mmdc else None
     return SyncContext(
         confluence=auth.confluence,
         space_key=args.space,
@@ -43,6 +55,7 @@ def _build_sync_context(
             docs.root, args.root_title, _collect_index_files(docs)
         ),
         generated_by="" if args.no_generated_by else args.generated_by,
+        mermaid_renderer=renderer,
     )
 
 

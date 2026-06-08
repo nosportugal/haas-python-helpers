@@ -7,6 +7,7 @@ single-module layout):
 - :func:`derive_title` — derive a page title from a Markdown file path.
 - :class:`ConversionResult`, :class:`ConverterOptions`, :class:`RepoContext`,
   :class:`SourcePaths` — conversion input/output types.
+- :class:`RenderedImage`, :class:`MermaidRenderer` — renderer port types.
 """
 
 from sync_confluence.converter._render import convert_markdown
@@ -14,6 +15,8 @@ from sync_confluence.converter._result import (
     Attachment,
     ConversionResult,
     ConverterOptions,
+    MermaidRenderer,
+    RenderedImage,
     RepoContext,
     SourcePaths,
 )
@@ -25,6 +28,8 @@ __all__ = [
     "ConversionError",
     "ConversionResult",
     "ConverterOptions",
+    "MermaidRenderer",
+    "RenderedImage",
     "RepoContext",
     "SourcePaths",
     "convert_markdown",

@@ -9,6 +9,8 @@ from typing import NamedTuple, Optional
 
 from atlassian import Confluence
 
+from sync_confluence.converter import MermaidRenderer
+
 log = logging.getLogger(__name__)
 
 _ACTION_SKIPPED = "skipped"
@@ -41,6 +43,7 @@ class SyncContext:
     page_width: Optional[str] = None
     doc_index: Optional[dict[Path, str]] = None
     generated_by: Optional[str] = None
+    mermaid_renderer: Optional[MermaidRenderer] = None
 
 
 def _new_sync_result() -> SyncResult:

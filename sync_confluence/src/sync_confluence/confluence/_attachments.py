@@ -9,11 +9,21 @@ from sync_confluence.confluence._logging import log
 from sync_confluence.converter import Attachment
 
 
+def _do_upload(confluence: Confluence, page_id: str, attachment: Attachment) -> None:
+    if attachment.raw_bytes is not None:
+        confluence.attach_content(
+            content=attachment.raw_bytes,
+            name=attachment.name,
+            content_type=attachment.content_type,
+            page_id=page_id,
+        )
+        return
+    confluence.attach_file(str(attachment.path), name=attachment.name, page_id=page_id)
+
+
 def _upload_one(confluence: Confluence, page_id: str, attachment: Attachment) -> None:
     try:
-        confluence.attach_file(
-            str(attachment.path), name=attachment.name, page_id=page_id
-        )
+        _do_upload(confluence, page_id, attachment)
     except Exception as exc:
         log.warning(
             "Could not upload attachment '%s' to page id=%s: %s",

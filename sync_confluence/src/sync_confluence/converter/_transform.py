@@ -18,7 +18,7 @@ def transform_tree(
     root: ElementType, options: ConverterOptions, conversion: ConversionResult
 ) -> None:
     """Run every block, link, image and widget transform over *root*."""
-    transform_code_blocks(root, options)
+    transform_code_blocks(root, options, conversion)
     transform_admonitions(root)
     transform_blocks(root)
     transform_tasks(root)

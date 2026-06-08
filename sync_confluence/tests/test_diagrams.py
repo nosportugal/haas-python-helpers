@@ -27,7 +27,6 @@ _MMDC = "/usr/bin/mmdc"
 _MERMAID_SRC = "graph TD; A-->B"
 _SHORT_SRC = "x"
 _RUN = "subprocess.run"
-_DIAGRAMS_MODULE = "sync_confluence.traversal._diagrams"
 _BAD_DATA_LEN = 64
 _MMDC_TIMEOUT = 30
 _RENDER_PNG_PATH = "sync_confluence.traversal._diagrams.render_mermaid_png"

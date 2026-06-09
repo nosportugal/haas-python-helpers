@@ -23,11 +23,14 @@ _RENDER_SVG_PATH = "sync_confluence.traversal._diagrams.render_mermaid_svg"
 _VIEWBOX_WIDTH = 1280
 _VIEWBOX_FLOAT_WIDTH = 1426
 _PX_WIDTH = 640
+_MAX_DISPLAY_WIDTH = 1800
 
 
-def _render_with(svg: bytes) -> RenderedImage | None:
+def _render_with(svg: bytes) -> RenderedImage:
     with patch(_RENDER_SVG_PATH, return_value=svg):
-        return make_mermaid_renderer(_MMDC)(_MERMAID_SRC)
+        image = make_mermaid_renderer(_MMDC)(_MERMAID_SRC)
+    assert image is not None
+    return image
 
 
 class TestMermaidAttachmentFilename:
@@ -127,25 +130,24 @@ class TestRenderedImageWidth:
 
     def test_width_parsed_from_viewbox(self):
         rendered = _render_with(b'<svg width="100%" viewBox="0 0 1280 720"></svg>')
-        assert rendered is not None
         assert rendered.width == _VIEWBOX_WIDTH
 
     def test_width_rounds_viewbox_float(self):
         rendered = _render_with(b'<svg viewBox="0 0 1426.5 423.2"></svg>')
-        assert rendered is not None
         assert rendered.width == _VIEWBOX_FLOAT_WIDTH
 
     def test_width_from_attribute(self):
         rendered = _render_with(b'<svg width="640px" height="480px"></svg>')
-        assert rendered is not None
         assert rendered.width == _PX_WIDTH
 
     def test_width_ignores_percentage_width(self):
         rendered = _render_with(b'<svg width="100%"></svg>')
-        assert rendered is not None
         assert rendered.width is None
 
     def test_width_none_when_viewbox_absent(self):
         rendered = _render_with(_FAKE_SVG)
-        assert rendered is not None
         assert rendered.width is None
+
+    def test_width_capped_at_max_display_width(self):
+        rendered = _render_with(b'<svg viewBox="0 0 3000 400"></svg>')
+        assert rendered.width == _MAX_DISPLAY_WIDTH

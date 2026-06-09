@@ -30,6 +30,7 @@ log = logging.getLogger(__name__)
 _HASH_PREFIX_LEN = 12
 _MMDC_TIMEOUT_SECS = 30
 _SVG_CONTENT_TYPE = "image/svg+xml"
+_MAX_DIAGRAM_DISPLAY_WIDTH = 1800
 _VIEWBOX_FIELDS = 4
 _SVG_TAG_RE = re.compile(rb"<svg\b[^>]*>", re.IGNORECASE)
 _VIEWBOX_RE = re.compile(rb'viewBox\s*=\s*"([^"]+)"')
@@ -150,11 +151,14 @@ class _MermaidRendererImpl:
         filename = mermaid_attachment_filename(source)
         svg_bytes = render_mermaid_svg(source, self._mmdc_path)
         if svg_bytes:
+            width = _extract_svg_width(svg_bytes)
+            if width is not None:
+                width = min(width, _MAX_DIAGRAM_DISPLAY_WIDTH)
             return RenderedImage(
                 name=filename,
                 raw_bytes=svg_bytes,
                 content_type=_SVG_CONTENT_TYPE,
-                width=_extract_svg_width(svg_bytes),
+                width=width,
             )
         return None
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 from unittest.mock import MagicMock, patch
 
+from sync_confluence.converter import RenderedImage
 from sync_confluence.traversal._diagrams import (
     find_mmdc,
     make_mermaid_renderer,
@@ -19,6 +20,14 @@ _FAKE_SVG = b"<svg xmlns='http://www.w3.org/2000/svg'><g></g></svg>"
 _RUN = "subprocess.run"
 _MMDC_TIMEOUT = 30
 _RENDER_SVG_PATH = "sync_confluence.traversal._diagrams.render_mermaid_svg"
+_VIEWBOX_WIDTH = 1280
+_VIEWBOX_FLOAT_WIDTH = 1426
+_PX_WIDTH = 640
+
+
+def _render_with(svg: bytes) -> RenderedImage | None:
+    with patch(_RENDER_SVG_PATH, return_value=svg):
+        return make_mermaid_renderer(_MMDC)(_MERMAID_SRC)
 
 
 class TestMermaidAttachmentFilename:
@@ -111,3 +120,32 @@ class TestMakeMermaidRenderer:
         assert r1 is not None
         assert r2 is not None
         assert r1.name == r2.name
+
+
+class TestRenderedImageWidth:
+    """Intrinsic width parsed from the rendered SVG, used for ``ac:width``."""
+
+    def test_width_parsed_from_viewbox(self):
+        rendered = _render_with(b'<svg width="100%" viewBox="0 0 1280 720"></svg>')
+        assert rendered is not None
+        assert rendered.width == _VIEWBOX_WIDTH
+
+    def test_width_rounds_viewbox_float(self):
+        rendered = _render_with(b'<svg viewBox="0 0 1426.5 423.2"></svg>')
+        assert rendered is not None
+        assert rendered.width == _VIEWBOX_FLOAT_WIDTH
+
+    def test_width_from_attribute(self):
+        rendered = _render_with(b'<svg width="640px" height="480px"></svg>')
+        assert rendered is not None
+        assert rendered.width == _PX_WIDTH
+
+    def test_width_ignores_percentage_width(self):
+        rendered = _render_with(b'<svg width="100%"></svg>')
+        assert rendered is not None
+        assert rendered.width is None
+
+    def test_width_none_when_viewbox_absent(self):
+        rendered = _render_with(_FAKE_SVG)
+        assert rendered is not None
+        assert rendered.width is None

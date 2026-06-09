@@ -12,12 +12,16 @@ class RenderedImage:
     """The output of a successful Mermaid-to-SVG render.
 
     *name* is the attachment filename (content-hash based); *raw_bytes* are the
-    raw SVG bytes; *content_type* is ``"image/svg+xml"``.
+    raw SVG bytes; *content_type* is ``"image/svg+xml"``; *width* is the
+    diagram's intrinsic pixel width (parsed from the SVG ``viewBox``) used to
+    set ``ac:width`` so Confluence renders the diagram at full size, or
+    ``None`` when it cannot be determined.
     """
 
     name: str
     raw_bytes: bytes
     content_type: str
+    width: Optional[int] = None
 
 
 class MermaidRenderer(Protocol):
@@ -81,7 +85,7 @@ class Attachment:
     flattened attachment filename used for the ``ri:filename`` reference and
     the upload.
 
-    For rendered diagrams (e.g. Mermaid PNG) *path* is ``None`` and
+    For rendered diagrams (e.g. Mermaid SVG) *path* is ``None`` and
     *raw_bytes* / *content_type* carry the in-memory payload.
     """
 

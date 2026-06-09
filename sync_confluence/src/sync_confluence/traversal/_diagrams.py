@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import shutil
 import subprocess
 from typing import Optional
@@ -29,6 +30,10 @@ log = logging.getLogger(__name__)
 _HASH_PREFIX_LEN = 12
 _MMDC_TIMEOUT_SECS = 30
 _SVG_CONTENT_TYPE = "image/svg+xml"
+_VIEWBOX_FIELDS = 4
+_SVG_TAG_RE = re.compile(rb"<svg\b[^>]*>", re.IGNORECASE)
+_VIEWBOX_RE = re.compile(rb'viewBox\s*=\s*"([^"]+)"')
+_WIDTH_ATTR_RE = re.compile(rb'\bwidth\s*=\s*"([^"]+)"')
 
 
 def find_mmdc(hint: Optional[str] = None) -> Optional[str]:
@@ -94,6 +99,43 @@ def render_mermaid_svg(
     return proc.stdout
 
 
+def _svg_length_to_int(raw: bytes) -> Optional[int]:
+    """Parse an SVG length such as ``b"1426.5"`` or ``b"1426px"`` to ``int``.
+
+    Returns ``None`` for non-pixel values such as ``b"100%"``.
+    """
+    text = raw.decode(errors="ignore").strip().removesuffix("px").strip()
+    try:
+        return round(float(text))
+    except ValueError:
+        return None
+
+
+def _extract_svg_width(svg_bytes: bytes) -> Optional[int]:
+    """Best-effort parse of a Mermaid diagram's intrinsic pixel width.
+
+    Mermaid renders with ``useMaxWidth`` enabled, so the root ``<svg>`` carries
+    ``width="100%"`` plus a ``viewBox`` whose third value is the natural width.
+    Confluence needs an explicit width to render the attachment at full size
+    instead of the tiny default SVG fallback, so the ``viewBox`` width is the
+    preferred source and the ``width`` attribute is the fallback. Returns
+    ``None`` when no usable pixel width is found.
+    """
+    tag = _SVG_TAG_RE.search(svg_bytes)
+    if tag is None:
+        return None
+    opening_tag = tag.group(0)
+    viewbox = _VIEWBOX_RE.search(opening_tag)
+    if viewbox is not None:
+        fields = viewbox.group(1).split()
+        if len(fields) == _VIEWBOX_FIELDS:
+            return _svg_length_to_int(fields[2])
+    width_attr = _WIDTH_ATTR_RE.search(opening_tag)
+    if width_attr is not None:
+        return _svg_length_to_int(width_attr.group(1))
+    return None
+
+
 class _MermaidRendererImpl:
     """Stateful callable that renders Mermaid source to a :class:`RenderedImage`.
 
@@ -112,6 +154,7 @@ class _MermaidRendererImpl:
                 name=filename,
                 raw_bytes=svg_bytes,
                 content_type=_SVG_CONTENT_TYPE,
+                width=_extract_svg_width(svg_bytes),
             )
         return None
 

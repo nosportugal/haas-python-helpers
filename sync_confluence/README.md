@@ -118,6 +118,7 @@ CLI flags take precedence over environment variables. Required flags must be sup
 - `--git-ref` / `GITHUB_REF_NAME`: Git ref used in rewritten GitHub link URLs (default: `main`)
 - `--mermaid-macro` / `CONFLUENCE_MERMAID_MACRO`: Confluence macro name for Mermaid diagrams; used as a fallback when `mmdc` is unavailable or rendering fails, otherwise omit to fall back to a plain code block
 - Mermaid fenced code blocks are rendered to SVG via `mmdc` and attached as Confluence images automatically on every live sync. Skipped in `--dry-run` (the macro or code-block fallback is previewed instead). If `mmdc` is not found a WARNING is emitted and the macro/code-block fallback is used
+- Rendered diagrams are sized to their intrinsic width (`ac:width`, from the SVG `viewBox`) so they use the available page width instead of Confluence's small default SVG size
 - `--mmdc-path` / `MMDC_PATH`: Path to the `mmdc` binary. Defaults to `mmdc` found on `$PATH`
 - `--generated-by` / `CONFLUENCE_GENERATED_BY`: Banner text prepended to every page as an info panel. Supports `%{filepath}`, `%{filename}`, `%{filedir}`, `%{filestem}` placeholders. Defaults to a standard auto-generated notice
 - `--no-generated-by`: Suppress the auto-generated banner panel

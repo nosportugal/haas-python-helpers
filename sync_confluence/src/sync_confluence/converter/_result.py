@@ -9,18 +9,15 @@ from typing import Optional, Protocol
 
 @dataclass(frozen=True)
 class RenderedImage:
-    """The output of a successful Mermaid-to-PNG render.
+    """The output of a successful Mermaid-to-SVG render.
 
     *name* is the attachment filename (content-hash based); *raw_bytes* are the
-    raw PNG bytes; *content_type* is ``"image/png"``; *width* and *height* are
-    pixel dimensions extracted from the IHDR chunk (``None`` when unreadable).
+    raw SVG bytes; *content_type* is ``"image/svg+xml"``.
     """
 
     name: str
     raw_bytes: bytes
     content_type: str
-    width: Optional[int]
-    height: Optional[int]
 
 
 class MermaidRenderer(Protocol):

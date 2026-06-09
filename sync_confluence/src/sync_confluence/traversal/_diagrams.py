@@ -9,8 +9,7 @@ Public API
 ----------
 - :func:`find_mmdc` — locate the ``mmdc`` binary.
 - :func:`mermaid_attachment_filename` — deterministic content-hash filename.
-- :func:`extract_png_dimensions` — read width/height from a PNG IHDR chunk.
-- :func:`render_mermaid_png` — call ``mmdc`` and return raw PNG bytes.
+- :func:`render_mermaid_svg` — call ``mmdc`` and return raw SVG bytes.
 - :func:`make_mermaid_renderer` — factory that returns a :class:`MermaidRenderer`
   callable.
 """
@@ -20,20 +19,16 @@ from __future__ import annotations
 import hashlib
 import logging
 import shutil
-import struct
 import subprocess
-from typing import Optional, Sequence
+from typing import Optional
 
 from sync_confluence.converter import MermaidRenderer, RenderedImage
 
 log = logging.getLogger(__name__)
 
-_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-_PNG_IHDR_DATA_OFFSET = 16  # signature (8) + length field (4) + "IHDR" (4)
-_PNG_DIMENSION_STRUCT = ">II"  # two big-endian unsigned 32-bit ints (W, H)
 _HASH_PREFIX_LEN = 12
 _MMDC_TIMEOUT_SECS = 30
-_PNG_CONTENT_TYPE = "image/png"
+_SVG_CONTENT_TYPE = "image/svg+xml"
 
 
 def find_mmdc(hint: Optional[str] = None) -> Optional[str]:
@@ -50,36 +45,18 @@ def find_mmdc(hint: Optional[str] = None) -> Optional[str]:
 def mermaid_attachment_filename(source: str) -> str:
     """Return a deterministic attachment filename for *source*.
 
-    The name is ``mermaid-{sha256[:12]}.png``, which means identical diagrams
+    The name is ``mermaid-{sha256[:12]}.svg``, which means identical diagrams
     reuse the same attachment slot.
     """
     digest = hashlib.sha256(source.encode()).hexdigest()
-    return "mermaid-{digest}.png".format(digest=digest[:_HASH_PREFIX_LEN])
+    return "mermaid-{digest}.svg".format(digest=digest[:_HASH_PREFIX_LEN])
 
 
-def extract_png_dimensions(raw_bytes: bytes) -> Optional[tuple[int, int]]:
-    """Extract pixel width and height from a PNG IHDR chunk.
-
-    Returns ``(width, height)`` or ``None`` if *raw_bytes* does not look like
-    a valid PNG or the IHDR chunk is too short to read.
-    """
-    if not raw_bytes.startswith(_PNG_SIGNATURE):
-        return None
-    end = _PNG_IHDR_DATA_OFFSET + struct.calcsize(_PNG_DIMENSION_STRUCT)
-    if len(raw_bytes) < end:
-        return None
-    width, height = struct.unpack_from(
-        _PNG_DIMENSION_STRUCT, raw_bytes, _PNG_IHDR_DATA_OFFSET
-    )
-    return width, height
-
-
-def render_mermaid_png(
+def render_mermaid_svg(
     source: str,
     mmdc_path: str,
-    extra_args: Sequence[str] = (),
 ) -> Optional[bytes]:
-    """Invoke ``mmdc`` and return the raw PNG bytes.
+    """Invoke ``mmdc`` and return the raw SVG bytes.
 
     *source* is fed via **stdin** (never via a temporary file or argv) to
     avoid shell injection and command-length limits.  Returns ``None`` on any
@@ -92,12 +69,7 @@ def render_mermaid_png(
         "--output",
         "-",
         "--outputFormat",
-        "png",
-        "--backgroundColor",
-        "transparent",
-        "--scale",
-        "2",
-        *extra_args,
+        "svg",
     ]
     try:
         proc = subprocess.run(  # noqa: S603
@@ -125,38 +97,32 @@ def render_mermaid_png(
 class _MermaidRendererImpl:
     """Stateful callable that renders Mermaid source to a :class:`RenderedImage`.
 
-    Keeps *mmdc_path* and *extra_args* bound so it satisfies the
-    :class:`MermaidRenderer` Protocol without requiring a nested function.
+    Keeps *mmdc_path* bound so it satisfies the :class:`MermaidRenderer`
+    Protocol without requiring a nested function.
     """
 
-    def __init__(self, mmdc_path: str, extra_args: Sequence[str]) -> None:
+    def __init__(self, mmdc_path: str) -> None:
         self._mmdc_path = mmdc_path
-        self._extra_args = extra_args
 
     def __call__(self, source: str) -> Optional[RenderedImage]:
         filename = mermaid_attachment_filename(source)
-        png_bytes = render_mermaid_png(source, self._mmdc_path, self._extra_args)
-        if png_bytes:
-            dims = extract_png_dimensions(png_bytes)
-            width, height = (None, None) if dims is None else dims
+        svg_bytes = render_mermaid_svg(source, self._mmdc_path)
+        if svg_bytes:
             return RenderedImage(
                 name=filename,
-                raw_bytes=png_bytes,
-                content_type=_PNG_CONTENT_TYPE,
-                width=width,
-                height=height,
+                raw_bytes=svg_bytes,
+                content_type=_SVG_CONTENT_TYPE,
             )
         return None
 
 
 def make_mermaid_renderer(
     mmdc_path: str,
-    extra_args: Sequence[str] = (),
 ) -> MermaidRenderer:
     """Return a :class:`MermaidRenderer` bound to *mmdc_path*.
 
-    The returned callable renders Mermaid source to PNG, extracts pixel
-    dimensions, and returns a :class:`RenderedImage`.  Returns ``None`` when
-    ``mmdc`` fails or produces no bytes.
+    The returned callable renders Mermaid source to SVG and returns a
+    :class:`RenderedImage`.  Returns ``None`` when ``mmdc`` fails or produces
+    no bytes.
     """
-    return _MermaidRendererImpl(mmdc_path, extra_args)
+    return _MermaidRendererImpl(mmdc_path)

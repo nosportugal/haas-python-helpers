@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import shlex
 from pathlib import Path
 
 from sync_confluence.cli._auth import _AuthInfo
@@ -32,13 +31,13 @@ def _collect_index_files(docs: _DocsInfo) -> list[Path]:
 def _build_sync_context(
     args: argparse.Namespace, docs: _DocsInfo, auth: _AuthInfo
 ) -> SyncContext:
-    render = getattr(args, "render_mermaid", False) and not args.dry_run
-    mmdc = find_mmdc(getattr(args, "mmdc_path", None)) if render else None
-    if render and mmdc is None:
-        log.warning("Mermaid rendering requested but mmdc not found; falling back")
-    mmdc_args_str = getattr(args, "mmdc_args", None)
-    extra_args = tuple(shlex.split(mmdc_args_str)) if mmdc_args_str else ()
-    renderer = make_mermaid_renderer(mmdc, extra_args) if mmdc else None
+    if args.dry_run:
+        renderer = None
+    else:
+        mmdc = find_mmdc(getattr(args, "mmdc_path", None))
+        if mmdc is None:
+            log.warning("mmdc not found; Mermaid diagrams will not be rendered")
+        renderer = make_mermaid_renderer(mmdc) if mmdc else None
     return SyncContext(
         confluence=auth.confluence,
         space_key=args.space,

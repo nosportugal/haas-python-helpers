@@ -12,11 +12,8 @@ from sync_confluence.converter import (
 )
 
 _MERMAID_MD = "```mermaid\ngraph TD; A-->B\n```\n"
-_PNG_HEADER = b"\x89PNG\r\n\x1a\n"
-_FAKE_PNG = _PNG_HEADER + b"\x00" * 100
-_FAKE_NAME = "mermaid-abc123.png"
-_WIDTH = 120
-_HEIGHT = 80
+_FAKE_SVG = b"<svg xmlns='http://www.w3.org/2000/svg'><g></g></svg>"
+_FAKE_NAME = "mermaid-abc123.svg"
 _AC_IMAGE = "ac:image"
 _MACRO_NAME = "mermaid-cloud"
 
@@ -24,17 +21,11 @@ _MACRO_NAME = "mermaid-cloud"
 class _FakeRenderer:
     """Fake renderer that always returns a :class:`RenderedImage`."""
 
-    def __init__(self, width: int = _WIDTH, height: int = _HEIGHT) -> None:
-        self._width = width
-        self._height = height
-
     def __call__(self, source: str) -> RenderedImage:
         return RenderedImage(
             name=_FAKE_NAME,
-            raw_bytes=_FAKE_PNG,
-            content_type="image/png",
-            width=self._width,
-            height=self._height,
+            raw_bytes=_FAKE_SVG,
+            content_type="image/svg+xml",
         )
 
 
@@ -60,20 +51,21 @@ class TestMermaidConverterWithRenderer:
         assert _AC_IMAGE in body
         assert _FAKE_NAME in body
 
-    def test_ac_width_and_height_emitted(self):
-        options = ConverterOptions(mermaid_renderer=_FakeRenderer(_WIDTH, _HEIGHT))
+    def test_no_ac_width_or_height_emitted(self):
+        options = ConverterOptions(mermaid_renderer=_FakeRenderer())
         body = _convert(options)
-        assert 'ac:width="{w}"'.format(w=_WIDTH) in body
-        assert 'ac:height="{h}"'.format(h=_HEIGHT) in body
+        assert "ac:width" not in body
+        assert "ac:height" not in body
 
     def test_attachment_added_to_result(self):
         options = ConverterOptions(mermaid_renderer=_FakeRenderer())
         conv = _convert_result(options)
         assert len(conv.attachments) == 1
         att = conv.attachments[0]
-        assert att.raw_bytes == _FAKE_PNG
+        assert att.raw_bytes == _FAKE_SVG
         assert att.name == _FAKE_NAME
         assert att.path is None
+        assert att.content_type == "image/svg+xml"
 
     def test_no_renderer_with_macro_uses_macro(self):
         options = ConverterOptions(mermaid_renderer=None, mermaid_macro=_MACRO_NAME)
@@ -86,14 +78,6 @@ class TestMermaidConverterWithRenderer:
         body = _convert(options)
         assert _AC_IMAGE not in body
         assert "structured-macro" in body
-
-    def test_no_width_height_when_none(self):
-        options = ConverterOptions(
-            mermaid_renderer=_FakeRenderer(width=None, height=None)  # type: ignore[arg-type]
-        )
-        body = _convert(options)
-        assert "ac:width" not in body
-        assert "ac:height" not in body
 
 
 class TestMermaidConverterRendererFallback:

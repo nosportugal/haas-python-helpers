@@ -7,7 +7,6 @@ import pytest
 from sync_confluence.cli import parse_args, validate_args
 
 _FULL_WIDTH = "full-width"
-_MAX_WIDTH = "max"
 _PAGE_WIDTH_FLAG = "--page-width"
 
 
@@ -72,10 +71,6 @@ class TestParseArgsPageWidth:
         args = parse_args([_PAGE_WIDTH_FLAG, "default"])
         assert args.page_width == "default"
 
-    def test_page_width_max_flag(self):
-        args = parse_args([_PAGE_WIDTH_FLAG, _MAX_WIDTH])
-        assert args.page_width == _MAX_WIDTH
-
     def test_page_width_env_var(self, monkeypatch):
         monkeypatch.setenv("CONFLUENCE_PAGE_WIDTH", _FULL_WIDTH)
         args = parse_args([])
@@ -133,8 +128,10 @@ class TestValidateArgsPageWidth:
     def test_valid_page_width_passes(self):
         validate_args(_make_args(page_width=_FULL_WIDTH))
 
-    def test_max_page_width_passes(self):
-        validate_args(_make_args(page_width=_MAX_WIDTH))
+    def test_max_page_width_rejected(self):
+        with pytest.raises(SystemExit) as exc_info:
+            validate_args(_make_args(page_width="max"))
+        assert exc_info.value.code == 2
 
     def test_none_page_width_passes(self):
         validate_args(_make_args(page_width=None))

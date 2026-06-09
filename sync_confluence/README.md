@@ -122,7 +122,7 @@ CLI flags take precedence over environment variables. Required flags must be sup
 - `--generated-by` / `CONFLUENCE_GENERATED_BY`: Banner text prepended to every page as an info panel. Supports `%{filepath}`, `%{filename}`, `%{filedir}`, `%{filestem}` placeholders. Defaults to a standard auto-generated notice
 - `--no-generated-by`: Suppress the auto-generated banner panel
 - `--page-width` / `CONFLUENCE_PAGE_WIDTH`: Set display width for every synced page.
-  `full-width` enables wide layout; `default` enforces standard Confluence width.
+  `full-width` renders content across the full browser width; `default` uses the standard Confluence narrow layout.
   Omit to leave page widths unchanged
 - `--dry-run`: Preview pages that would be created, updated, or deleted without making any API calls
 - `--log-level` / `LOG_LEVEL`: Logging verbosity — `DEBUG`, `INFO`, `WARNING`, `ERROR` (default: `INFO`)

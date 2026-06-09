@@ -127,7 +127,7 @@ class TestMakeMermaidRenderer:
         assert r1.name == r2.name
 
 
-class TestRenderedImageDimensions:
+class TestDisplayDimensions:
     """Display size parsed from the SVG ``viewBox`` for ``ac:width`` / ``ac:height``."""
 
     def test_dimensions_parsed_from_viewbox(self):
@@ -154,3 +154,12 @@ class TestRenderedImageDimensions:
         rendered = _render_with(_FAKE_SVG)
         assert rendered.width is None
         assert rendered.height is None
+
+    def test_svg_bytes_patched_with_pixel_dimensions(self):
+        rendered = _render_with(b'<svg width="100%" viewBox="0 0 1280 720"></svg>')
+        assert b'width="1280"' in rendered.raw_bytes
+        assert b'height="720"' in rendered.raw_bytes
+
+    def test_percentage_width_removed_from_svg_bytes(self):
+        rendered = _render_with(b'<svg width="100%" viewBox="0 0 1280 720"></svg>')
+        assert b'width="100%"' not in rendered.raw_bytes

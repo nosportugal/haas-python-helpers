@@ -31,9 +31,16 @@ _HASH_PREFIX_LEN = 12
 _MMDC_TIMEOUT_SECS = 30
 _SVG_CONTENT_TYPE = "image/svg+xml"
 _MAX_DIAGRAM_DISPLAY_WIDTH = 1800
-_VIEWBOX_FIELDS = 4
+_NO_DIMS = (None, None)
 _SVG_TAG_RE = re.compile(rb"<svg\b[^>]*>", re.IGNORECASE)
-_VIEWBOX_RE = re.compile(rb'viewBox\s*=\s*"([^"]+)"')
+_VIEWBOX_DIMS_RE = re.compile(
+    r'viewBox\s*=\s*"[^\s"]+\s+[^\s"]+\s+([^\s"]+)\s+([^\s"]+)"'
+)
+_WIDTH_ATTR_RE = re.compile(rb'\bwidth\s*=\s*"([^"]+)"')
+_HEIGHT_ATTR_RE = re.compile(rb'\s+height\s*=\s*"[^"]*"', re.IGNORECASE)
+_STYLE_MAX_WIDTH_RE = re.compile(
+    rb'\s+style\s*=\s*"[^"]*max-width[^"]*"', re.IGNORECASE
+)
 
 
 def find_mmdc(hint: Optional[str] = None) -> Optional[str]:
@@ -99,48 +106,56 @@ def render_mermaid_svg(
     return proc.stdout
 
 
-def _svg_length_to_int(raw: bytes) -> Optional[int]:
-    """Parse an SVG length such as ``b"1426.5"`` or ``b"1426px"`` to ``int``.
-
-    Returns ``None`` for non-pixel values such as ``b"100%"``.
-    """
-    text = raw.decode(errors="ignore").strip().removesuffix("px").strip()
-    try:
-        return round(float(text))
-    except ValueError:
-        return None
-
-
 def _display_dimensions(svg_bytes: bytes) -> tuple[Optional[int], Optional[int]]:
     """Return the (width, height) Confluence should display the diagram at.
 
-    Mermaid renders with ``useMaxWidth`` enabled, so the root ``<svg>`` carries
-    ``width="100%"`` and only a ``viewBox`` whose third and fourth values are
-    the natural width and height. Confluence cannot infer an SVG's intrinsic
-    pixel size from ``width="100%"``, so without explicit dimensions it reserves
-    a default, over-tall box and leaves a large gap around the diagram. The
-    natural size is read from the ``viewBox`` and scaled down so the width never
-    exceeds ``_MAX_DIAGRAM_DISPLAY_WIDTH``; both values are returned so the
-    aspect ratio is preserved. Returns ``(None, None)`` when the size cannot be
-    determined.
+    The natural size is read from the ``viewBox`` and scaled down so the width
+    never exceeds ``_MAX_DIAGRAM_DISPLAY_WIDTH``, preserving the aspect ratio.
+    Returns ``_NO_DIMS`` when the size cannot be determined.
     """
-    opening = _SVG_TAG_RE.search(svg_bytes)
-    if opening is None:
-        return (None, None)
-    viewbox = _VIEWBOX_RE.search(opening.group(0))
+    tag = _SVG_TAG_RE.search(svg_bytes)
+    if tag is None:
+        return _NO_DIMS
+    viewbox = _VIEWBOX_DIMS_RE.search(tag.group(0).decode())
     if viewbox is None:
-        return (None, None)
-    fields = viewbox.group(1).split()
-    if len(fields) != _VIEWBOX_FIELDS:
-        return (None, None)
-    width = _svg_length_to_int(fields[2])
-    height = _svg_length_to_int(fields[3])
+        return _NO_DIMS
+    try:
+        width, height = (
+            round(float(viewbox.group(1))),
+            round(float(viewbox.group(2))),
+        )
+    except ValueError:
+        return _NO_DIMS
     if not width or not height:
-        return (None, None)
+        return _NO_DIMS
     if width > _MAX_DIAGRAM_DISPLAY_WIDTH:
-        height = round(height * _MAX_DIAGRAM_DISPLAY_WIDTH / width)
+        height = height * _MAX_DIAGRAM_DISPLAY_WIDTH // width
         width = _MAX_DIAGRAM_DISPLAY_WIDTH
     return (width, height)
+
+
+def _patch_svg_dimensions(svg_bytes: bytes, width: int, height: int) -> bytes:
+    """Rewrite the root ``<svg>`` element to carry explicit pixel dimensions.
+
+    Mermaid renders SVGs with ``width="100%"`` and ``style="max-width:Npx"``.
+    Confluence's media pipeline cannot infer intrinsic dimensions from
+    percentage widths, leaving the height field blank and reserving a
+    default-sized container much taller than the diagram. Setting ``width``
+    and ``height`` to the computed display pixel values lets the media
+    pipeline populate both dimensions, removing the blank gap.
+    """
+    tag_match = _SVG_TAG_RE.search(svg_bytes)
+    if tag_match is None:
+        return svg_bytes
+    tag = tag_match.group(0)
+    dims = f'width="{width}" height="{height}"'.encode()
+    new_tag = _HEIGHT_ATTR_RE.sub(b"", tag)
+    if _WIDTH_ATTR_RE.search(new_tag):
+        new_tag = _WIDTH_ATTR_RE.sub(dims, new_tag)
+    else:
+        new_tag = b"".join([new_tag[:-1], b" ", dims, b">"])
+    new_tag = _STYLE_MAX_WIDTH_RE.sub(b"", new_tag)
+    return svg_bytes.replace(tag, new_tag, 1)
 
 
 class _MermaidRendererImpl:
@@ -158,6 +173,8 @@ class _MermaidRendererImpl:
         if not svg_bytes:
             return None
         width, height = _display_dimensions(svg_bytes)
+        if width and height:
+            svg_bytes = _patch_svg_dimensions(svg_bytes, width, height)
         return RenderedImage(
             name=mermaid_attachment_filename(source),
             raw_bytes=svg_bytes,

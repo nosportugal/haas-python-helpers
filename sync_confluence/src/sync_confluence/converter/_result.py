@@ -12,16 +12,18 @@ class RenderedImage:
     """The output of a successful Mermaid-to-SVG render.
 
     *name* is the attachment filename (content-hash based); *raw_bytes* are the
-    raw SVG bytes; *content_type* is ``"image/svg+xml"``; *width* is the
-    diagram's intrinsic pixel width (parsed from the SVG ``viewBox``) used to
-    set ``ac:width`` so Confluence renders the diagram at full size, or
-    ``None`` when it cannot be determined.
+    raw SVG bytes; *content_type* is ``"image/svg+xml"``; *width* and *height*
+    are the display pixel dimensions (parsed from the SVG ``viewBox`` and
+    scaled to fit) used to set ``ac:width`` / ``ac:height`` so Confluence
+    renders the diagram at the right size and reserves the correct space.
+    Either dimension is ``None`` when it cannot be determined.
     """
 
     name: str
     raw_bytes: bytes
     content_type: str
     width: Optional[int] = None
+    height: Optional[int] = None
 
 
 class MermaidRenderer(Protocol):

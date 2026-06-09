@@ -15,6 +15,7 @@ _MERMAID_MD = "```mermaid\ngraph TD; A-->B\n```\n"
 _FAKE_SVG = b"<svg xmlns='http://www.w3.org/2000/svg'><g></g></svg>"
 _FAKE_NAME = "mermaid-abc123.svg"
 _FAKE_WIDTH = 1280
+_FAKE_HEIGHT = 720
 _AC_IMAGE = "ac:image"
 _MACRO_NAME = "mermaid-cloud"
 
@@ -22,8 +23,13 @@ _MACRO_NAME = "mermaid-cloud"
 class _FakeRenderer:
     """Fake renderer that always returns a :class:`RenderedImage`."""
 
-    def __init__(self, width: int | None = _FAKE_WIDTH) -> None:
+    def __init__(
+        self,
+        width: int | None = _FAKE_WIDTH,
+        height: int | None = _FAKE_HEIGHT,
+    ) -> None:
         self._width = width
+        self._height = height
 
     def __call__(self, source: str) -> RenderedImage:
         return RenderedImage(
@@ -31,6 +37,7 @@ class _FakeRenderer:
             raw_bytes=_FAKE_SVG,
             content_type="image/svg+xml",
             width=self._width,
+            height=self._height,
         )
 
 
@@ -56,17 +63,19 @@ class TestMermaidConverterWithRenderer:
         assert _AC_IMAGE in body
         assert _FAKE_NAME in body
 
-    def test_ac_width_emitted_from_intrinsic_width(self):
+    def test_ac_width_and_height_emitted(self):
         options = ConverterOptions(mermaid_renderer=_FakeRenderer())
         body = _convert(options)
         assert 'ac:width="{width}"'.format(width=_FAKE_WIDTH) in body
-        assert "ac:height" not in body
+        assert 'ac:height="{height}"'.format(height=_FAKE_HEIGHT) in body
 
-    def test_no_ac_width_when_width_unknown(self):
-        options = ConverterOptions(mermaid_renderer=_FakeRenderer(width=None))
+    def test_no_ac_dimensions_when_unknown(self):
+        renderer = _FakeRenderer(width=None, height=None)
+        options = ConverterOptions(mermaid_renderer=renderer)
         body = _convert(options)
         assert _AC_IMAGE in body
         assert "ac:width" not in body
+        assert "ac:height" not in body
 
     def test_attachment_added_to_result(self):
         options = ConverterOptions(mermaid_renderer=_FakeRenderer())

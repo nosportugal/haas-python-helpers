@@ -44,11 +44,15 @@ def _plain_text_macro(
 
 
 def _rendered_image_element(
-    attachment: Attachment, width: Optional[int] = None
+    attachment: Attachment,
+    width: Optional[int] = None,
+    height: Optional[int] = None,
 ) -> ElementType:
     image = AC("image")
     if width is not None:
         image.set(qname(_AC, "width"), str(width))
+    if height is not None:
+        image.set(qname(_AC, "height"), str(height))
     image.append(RI("attachment", {qname(_RI, "filename"): attachment.name}))
     return image
 
@@ -69,7 +73,7 @@ def _build_macro(
                 content_type=rendered.content_type,
             )
             conversion.attachments.append(attachment)
-            return _rendered_image_element(attachment, rendered.width)
+            return _rendered_image_element(attachment, rendered.width, rendered.height)
         log.warning("Mermaid renderer returned None; falling back")
     if name == "mermaid" and options.mermaid_macro:
         return _plain_text_macro(options.mermaid_macro, text)

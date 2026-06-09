@@ -34,7 +34,6 @@ _MAX_DIAGRAM_DISPLAY_WIDTH = 1800
 _VIEWBOX_FIELDS = 4
 _SVG_TAG_RE = re.compile(rb"<svg\b[^>]*>", re.IGNORECASE)
 _VIEWBOX_RE = re.compile(rb'viewBox\s*=\s*"([^"]+)"')
-_WIDTH_ATTR_RE = re.compile(rb'\bwidth\s*=\s*"([^"]+)"')
 
 
 def find_mmdc(hint: Optional[str] = None) -> Optional[str]:
@@ -112,29 +111,36 @@ def _svg_length_to_int(raw: bytes) -> Optional[int]:
         return None
 
 
-def _extract_svg_width(svg_bytes: bytes) -> Optional[int]:
-    """Best-effort parse of a Mermaid diagram's intrinsic pixel width.
+def _display_dimensions(svg_bytes: bytes) -> tuple[Optional[int], Optional[int]]:
+    """Return the (width, height) Confluence should display the diagram at.
 
     Mermaid renders with ``useMaxWidth`` enabled, so the root ``<svg>`` carries
-    ``width="100%"`` plus a ``viewBox`` whose third value is the natural width.
-    Confluence needs an explicit width to render the attachment at full size
-    instead of the tiny default SVG fallback, so the ``viewBox`` width is the
-    preferred source and the ``width`` attribute is the fallback. Returns
-    ``None`` when no usable pixel width is found.
+    ``width="100%"`` and only a ``viewBox`` whose third and fourth values are
+    the natural width and height. Confluence cannot infer an SVG's intrinsic
+    pixel size from ``width="100%"``, so without explicit dimensions it reserves
+    a default, over-tall box and leaves a large gap around the diagram. The
+    natural size is read from the ``viewBox`` and scaled down so the width never
+    exceeds ``_MAX_DIAGRAM_DISPLAY_WIDTH``; both values are returned so the
+    aspect ratio is preserved. Returns ``(None, None)`` when the size cannot be
+    determined.
     """
-    tag = _SVG_TAG_RE.search(svg_bytes)
-    if tag is None:
-        return None
-    opening_tag = tag.group(0)
-    viewbox = _VIEWBOX_RE.search(opening_tag)
-    if viewbox is not None:
-        fields = viewbox.group(1).split()
-        if len(fields) == _VIEWBOX_FIELDS:
-            return _svg_length_to_int(fields[2])
-    width_attr = _WIDTH_ATTR_RE.search(opening_tag)
-    if width_attr is not None:
-        return _svg_length_to_int(width_attr.group(1))
-    return None
+    opening = _SVG_TAG_RE.search(svg_bytes)
+    if opening is None:
+        return (None, None)
+    viewbox = _VIEWBOX_RE.search(opening.group(0))
+    if viewbox is None:
+        return (None, None)
+    fields = viewbox.group(1).split()
+    if len(fields) != _VIEWBOX_FIELDS:
+        return (None, None)
+    width = _svg_length_to_int(fields[2])
+    height = _svg_length_to_int(fields[3])
+    if not width or not height:
+        return (None, None)
+    if width > _MAX_DIAGRAM_DISPLAY_WIDTH:
+        height = round(height * _MAX_DIAGRAM_DISPLAY_WIDTH / width)
+        width = _MAX_DIAGRAM_DISPLAY_WIDTH
+    return (width, height)
 
 
 class _MermaidRendererImpl:
@@ -148,19 +154,17 @@ class _MermaidRendererImpl:
         self._mmdc_path = mmdc_path
 
     def __call__(self, source: str) -> Optional[RenderedImage]:
-        filename = mermaid_attachment_filename(source)
         svg_bytes = render_mermaid_svg(source, self._mmdc_path)
-        if svg_bytes:
-            width = _extract_svg_width(svg_bytes)
-            if width is not None:
-                width = min(width, _MAX_DIAGRAM_DISPLAY_WIDTH)
-            return RenderedImage(
-                name=filename,
-                raw_bytes=svg_bytes,
-                content_type=_SVG_CONTENT_TYPE,
-                width=width,
-            )
-        return None
+        if not svg_bytes:
+            return None
+        width, height = _display_dimensions(svg_bytes)
+        return RenderedImage(
+            name=mermaid_attachment_filename(source),
+            raw_bytes=svg_bytes,
+            content_type=_SVG_CONTENT_TYPE,
+            width=width,
+            height=height,
+        )
 
 
 def make_mermaid_renderer(

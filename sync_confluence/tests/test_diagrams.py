@@ -21,9 +21,11 @@ _RUN = "subprocess.run"
 _MMDC_TIMEOUT = 30
 _RENDER_SVG_PATH = "sync_confluence.traversal._diagrams.render_mermaid_svg"
 _VIEWBOX_WIDTH = 1280
+_VIEWBOX_HEIGHT = 720
 _VIEWBOX_FLOAT_WIDTH = 1426
-_PX_WIDTH = 640
+_VIEWBOX_FLOAT_HEIGHT = 423
 _MAX_DISPLAY_WIDTH = 1800
+_SCALED_HEIGHT = 240
 
 
 def _render_with(svg: bytes) -> RenderedImage:
@@ -125,29 +127,30 @@ class TestMakeMermaidRenderer:
         assert r1.name == r2.name
 
 
-class TestRenderedImageWidth:
-    """Intrinsic width parsed from the rendered SVG, used for ``ac:width``."""
+class TestRenderedImageDimensions:
+    """Display size parsed from the SVG ``viewBox`` for ``ac:width`` / ``ac:height``."""
 
-    def test_width_parsed_from_viewbox(self):
+    def test_dimensions_parsed_from_viewbox(self):
         rendered = _render_with(b'<svg width="100%" viewBox="0 0 1280 720"></svg>')
         assert rendered.width == _VIEWBOX_WIDTH
+        assert rendered.height == _VIEWBOX_HEIGHT
 
-    def test_width_rounds_viewbox_float(self):
+    def test_dimensions_round_viewbox_floats(self):
         rendered = _render_with(b'<svg viewBox="0 0 1426.5 423.2"></svg>')
         assert rendered.width == _VIEWBOX_FLOAT_WIDTH
+        assert rendered.height == _VIEWBOX_FLOAT_HEIGHT
 
-    def test_width_from_attribute(self):
-        rendered = _render_with(b'<svg width="640px" height="480px"></svg>')
-        assert rendered.width == _PX_WIDTH
-
-    def test_width_ignores_percentage_width(self):
-        rendered = _render_with(b'<svg width="100%"></svg>')
-        assert rendered.width is None
-
-    def test_width_none_when_viewbox_absent(self):
-        rendered = _render_with(_FAKE_SVG)
-        assert rendered.width is None
-
-    def test_width_capped_at_max_display_width(self):
+    def test_width_capped_and_height_scaled(self):
         rendered = _render_with(b'<svg viewBox="0 0 3000 400"></svg>')
         assert rendered.width == _MAX_DISPLAY_WIDTH
+        assert rendered.height == _SCALED_HEIGHT
+
+    def test_no_dimensions_when_viewbox_absent(self):
+        rendered = _render_with(b'<svg width="640px" height="480px"></svg>')
+        assert rendered.width is None
+        assert rendered.height is None
+
+    def test_no_dimensions_for_percentage_only(self):
+        rendered = _render_with(_FAKE_SVG)
+        assert rendered.width is None
+        assert rendered.height is None

@@ -7,6 +7,11 @@ def _body(md: str) -> str:
     return convert_markdown(md).body
 
 
+_PANEL_INFO = 'ac:name="info"'
+_PANEL_NOTE = 'ac:name="note"'
+_MARKER_WARNING = "[!WARNING]"
+
+
 class TestMarkdownFeatures:
     """Tests for the expanded Markdown feature set (Phase 4)."""
 
@@ -17,8 +22,8 @@ class TestMarkdownFeatures:
 
     def test_github_alert_becomes_panel(self):
         output = _body("> [!WARNING]\n> Careful")
-        assert 'ac:name="note"' in output
-        assert "[!WARNING]" not in output
+        assert _PANEL_NOTE in output
+        assert _MARKER_WARNING not in output
         assert "Careful" in output
 
     def test_task_list_statuses(self):
@@ -42,3 +47,36 @@ class TestMarkdownFeatures:
         assert "<sub>2</sub>" in output
         assert "<sup>2</sup>" in output
         assert "\U0001f604" in output
+
+    def test_multi_alerts_produce_separate_panels(self):
+        output = _body("> [!NOTE]\n> First.\n> [!WARNING]\n> Second.")
+        assert _PANEL_INFO in output
+        assert _PANEL_NOTE in output
+        assert _MARKER_WARNING not in output
+        assert "First." in output
+        assert "Second." in output
+
+
+class TestMultiAlerts:
+    """Tests for consecutive GitHub-alert blockquote splitting."""
+
+    def test_three_multi_alerts_produce_panels(self):
+        output = _body("> [!NOTE]\n> a\n> [!TIP]\n> b\n> [!WARNING]\n> c")
+        assert _PANEL_INFO in output
+        assert 'ac:name="tip"' in output
+        assert _PANEL_NOTE in output
+        assert "[!TIP]" not in output
+        assert _MARKER_WARNING not in output
+
+    def test_multi_alert_preserves_inline_elems(self):
+        output = _body("> [!NOTE]\n> See **bold** text\n> [!WARNING]\n> Second.")
+        assert "bold" in output
+        assert _PANEL_INFO in output
+        assert _PANEL_NOTE in output
+        assert _MARKER_WARNING not in output
+
+    def test_multi_alert_unknown_type_as_plain(self):
+        output = _body("> [!NOTE]\n> First.\n> [!CUSTOM]\n> Unknown content.")
+        assert _PANEL_INFO in output
+        assert "Unknown content." in output
+        assert "[!CUSTOM]" not in output

@@ -9,7 +9,7 @@ from typing import Optional
 from lxml import etree
 
 from sync_confluence.converter._csf import AC, RI, ElementType, qname
-from sync_confluence.converter._languages import resolve_language
+from sync_confluence.converter._languages import _PLAIN_TEXT_ALIASES, resolve_language
 from sync_confluence.converter._result import (
     Attachment,
     ConversionResult,
@@ -78,7 +78,12 @@ def _build_macro(
     if name == "mermaid" and options.mermaid_macro:
         return _plain_text_macro(options.mermaid_macro, text)
     language = resolve_language(name, force_valid=options.force_valid_language)
-    if name and language is None and name != "mermaid":
+    if (
+        name
+        and language is None
+        and name != "mermaid"
+        and name.lower() not in _PLAIN_TEXT_ALIASES
+    ):
         log.warning("Dropping unsupported code language '%s'", name)
     return _plain_text_macro("code", text, language)
 

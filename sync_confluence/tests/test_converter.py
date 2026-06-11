@@ -11,6 +11,7 @@ from sync_confluence.converter import (
 
 README_FILENAME = "README.md"
 _CODE_MACRO = 'ac:name="code"'
+_LANGUAGE_PARAM = 'ac:name="language">'
 
 
 def _body(md: str, options: ConverterOptions | None = None) -> str:
@@ -27,7 +28,7 @@ class TestConvertMarkdown:
         output = _body("```python\nprint('hi')\n```")
         assert _CODE_MACRO in output
         # python is normalised to Confluence's canonical id "py"
-        assert 'ac:name="language">py</ac:parameter>' in output
+        assert f"{_LANGUAGE_PARAM}py</ac:parameter>" in output
         assert "print('hi')" in output
 
     def test_fenced_code_block_without_language(self):
@@ -85,6 +86,30 @@ class TestConvertMarkdownEdgeCases:
     def test_malformed_html_raises_conversion_error(self):
         with pytest.raises(ConversionError):
             convert_markdown('<div markdown="1">\n<span>oops\n</div>')
+
+
+class TestLanguageAliases:
+    """Common fenced-block aliases resolve to Confluence canonical ids."""
+
+    def test_sh_maps_to_shell(self):
+        output = _body("```sh\necho hi\n```")
+        assert _CODE_MACRO in output
+        assert f"{_LANGUAGE_PARAM}shell</ac:parameter>" in output
+
+    def test_yml_maps_to_yaml(self):
+        output = _body("```yml\nkey: val\n```")
+        assert _CODE_MACRO in output
+        assert f"{_LANGUAGE_PARAM}yaml</ac:parameter>" in output
+
+    def test_ts_maps_to_typescript(self):
+        output = _body("```ts\nconst x = 1;\n```")
+        assert _CODE_MACRO in output
+        assert f"{_LANGUAGE_PARAM}typescript</ac:parameter>" in output
+
+    def test_text_alias_produces_no_language(self):
+        output = _body("```text\njust text\n```")
+        assert "language" not in output
+        assert "just text" in output
 
 
 class TestDeriveTitle:

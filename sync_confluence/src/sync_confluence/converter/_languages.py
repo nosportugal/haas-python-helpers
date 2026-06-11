@@ -10,6 +10,16 @@ from __future__ import annotations
 from types import MappingProxyType
 from typing import Optional
 
+_PLAIN_TEXT_ALIASES: frozenset[str] = frozenset(
+    ("none", "output", "plain", "plaintext", "text", "txt")
+)
+
+# Constants for language IDs that appear 4+ times as dict values (WPS226).
+_LANG_C_SHARP = "c#"
+_LANG_KOTLIN = "kotlin"
+_LANG_POWERSHELL = "powershell"
+_LANG_SHELL = "shell"
+
 _LANGUAGES = MappingProxyType(
     {
         "abap": "abap",
@@ -20,18 +30,21 @@ _LANGUAGES = MappingProxyType(
         "autoit": "autoit",
         "bash": "bash",
         "c": "c",
-        "c#": "c#",
+        "c#": _LANG_C_SHARP,
+        "c++": "cpp",
         "clojure": "clojure",
         "coffeescript": "coffeescript",
         "coldfusion": "coldfusion",
         "cpp": "cpp",
-        "csharp": "c#",
+        "cs": _LANG_C_SHARP,
+        "csharp": _LANG_C_SHARP,
         "css": "css",
         "cuda": "cuda",
         "d": "d",
         "dart": "dart",
         "delphi": "delphi",
         "diff": "diff",
+        "docker": "dockerfile",
         "dockerfile": "dockerfile",
         "elixir": "elixir",
         "erl": "erl",
@@ -40,21 +53,28 @@ _LANGUAGES = MappingProxyType(
         "foxpro": "foxpro",
         "gherkin": "gherkin",
         "go": "go",
+        "golang": "go",
         "graphql": "graphql",
+        "gql": "graphql",
         "groovy": "groovy",
         "handlebars": "handlebars",
         "haskell": "haskell",
         "haxe": "haxe",
+        "hbs": "handlebars",
         "hcl": "hcl",
+        "hs": "haskell",
         "html": "html",
         "java": "java",
         "javafx": "javafx",
         "javascript": "js",
+        "jl": "julia",
         "js": "js",
         "json": "json",
         "jsx": "jsx",
         "julia": "julia",
-        "kotlin": "kotlin",
+        "kotlin": _LANG_KOTLIN,
+        "kt": _LANG_KOTLIN,
+        "kts": _LANG_KOTLIN,
         "livescript": "livescript",
         "lua": "lua",
         "mathematica": "mathematica",
@@ -66,22 +86,29 @@ _LANGUAGES = MappingProxyType(
         "pascal": "pascal",
         "perl": "perl",
         "php": "php",
-        "powershell": "powershell",
+        "pl": "perl",
+        "powershell": _LANG_POWERSHELL,
         "prolog": "prolog",
         "protobuf": "protobuf",
+        "ps": _LANG_POWERSHELL,
+        "ps1": _LANG_POWERSHELL,
         "puppet": "puppet",
         "py": "py",
         "python": "py",
         "qml": "qml",
         "r": "r",
         "racket": "racket",
+        "rb": "ruby",
+        "rs": "rust",
         "rst": "rst",
         "ruby": "ruby",
         "rust": "rust",
         "sass": "sass",
         "scala": "scala",
         "scheme": "scheme",
-        "shell": "shell",
+        "sh": _LANG_SHELL,
+        "shell": _LANG_SHELL,
+        "shellscript": _LANG_SHELL,
         "smalltalk": "smalltalk",
         "splunk": "splunk",
         "sql": "sql",
@@ -90,6 +117,7 @@ _LANGUAGES = MappingProxyType(
         "tcl": "tcl",
         "tex": "tex",
         "toml": "toml",
+        "ts": "typescript",
         "tsx": "tsx",
         "typescript": "typescript",
         "vala": "vala",
@@ -99,6 +127,8 @@ _LANGUAGES = MappingProxyType(
         "xml": "xml",
         "xquery": "xquery",
         "yaml": "yaml",
+        "yml": "yaml",
+        "zsh": _LANG_SHELL,
     }
 )
 

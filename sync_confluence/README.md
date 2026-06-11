@@ -12,12 +12,13 @@ Syncs a `docs/` directory tree (or a flat list of Markdown files) to Confluence 
 - CLI tool for one-way sync of Markdown docs to Confluence Cloud
 - Folder mirroring, fenced-code block and Mermaid macro support
 - Native internal links: relative `.md` links become `ac:link` page references (preserving `#anchors`); out-of-scope links fall back to GitHub blob URLs
-- Image upload: local images are attached to the page and referenced via `ac:image`
+- Image upload: local images are attached to the page and referenced via `ac:image`; `.svg` sources with a same-name `.png` sibling automatically use the PNG
 - Rich Markdown: admonitions and GitHub alerts (`> [!NOTE]`) become info/tip/note/warning panels; task lists, collapsible `<details>` (expand macro), `[TOC]`/`[[_TOC_]]`, emoji and super/subscript are supported
 - Generated-by banner: an info panel is prepended to every page (customizable or suppressible)
-- Orphan cleanup with label-based page management — only pages tagged with the managed-by label are eligible for deletion
+- Orphan cleanup with label-based page management — only pages tagged with the managed-by label are eligible for deletion (see [Orphan cleanup](#orphan-cleanup-always-active) for the full warning)
 - Rename detection: renames existing pages in place instead of creating duplicates
-- Page edit restrictions: synced pages are set to read-only for everyone except the syncing account
+- Page edit restrictions: synced pages are set to read-only for everyone except the syncing account (always applied; no opt-out flag — if the Confluence API cannot return an `accountId` for the authenticating user the sync aborts before touching any pages)
+- Image upload: `.svg` images with a same-name `.png` sibling use the PNG automatically
 - Python 3.11+ required
 
 ## Installation
@@ -38,19 +39,9 @@ pip install git+https://github.com/nosportugal/haas-python-helpers.git#subdirect
 
 ## Usage
 
-### CLI Example: Dry run (preview, no API calls)
+### CLI Example: Sync docs
 
-```bash
-python -m sync_confluence \
-    --url  https://acme.atlassian.net \
-    --email user@acme.com \
-    --token <api-token> \
-    --space DOCS \
-    --parent-id 12345 \
-    --dry-run
-```
-
-### CLI Example: Live sync
+Add `--dry-run` to preview what would be created, updated, or deleted without making any API calls.
 
 ```bash
 python -m sync_confluence \
@@ -116,11 +107,12 @@ CLI flags take precedence over environment variables. Required flags must be sup
 - `--root-parent` / `CONFLUENCE_ROOT_PARENT`: Title of a container folder to find or create under `--parent-id`. Mutually exclusive with `--no-root` and `--root-title`
 - `--managed-by` / `CONFLUENCE_MANAGED_BY`: Label applied to every managed page; only these are eligible for orphan deletion (default: derived from git repository name)
 - `--git-ref` / `GITHUB_REF_NAME`: Git ref used in rewritten GitHub link URLs (default: `main`)
-- `--mermaid-macro` / `CONFLUENCE_MERMAID_MACRO`: Confluence macro name for Mermaid diagrams; used as a fallback when `mmdc` is unavailable or rendering fails, otherwise omit to fall back to a plain code block
-- Mermaid fenced code blocks are rendered to SVG via `mmdc` and attached as Confluence images automatically on every live sync. Skipped in `--dry-run` (the macro or code-block fallback is previewed instead). If `mmdc` is not found a WARNING is emitted and the macro/code-block fallback is used
+- `--mermaid-macro` / `CONFLUENCE_MERMAID_MACRO`: Confluence macro name used as the secondary Mermaid fallback. Priority order: (1) render via `mmdc` to SVG; (2) emit this macro if set; (3) fall back to a plain code block. Omit this flag when you have no Confluence Mermaid macro installed
+- Mermaid fenced code blocks are rendered to SVG via `mmdc` and attached as Confluence images automatically on every live sync. Skipped in `--dry-run` (the macro or code-block fallback is previewed instead). If `mmdc` is not found a WARNING is emitted and the fallback chain (macro → code block) applies
 - Rendered diagrams are sized to their intrinsic dimensions (`ac:width` / `ac:height`, from the SVG `viewBox`, scaled to fit the page) so they use the available width and reserve the correct height instead of Confluence's small or mis-sized default SVG box
 - `--mmdc-path` / `MMDC_PATH`: Path to the `mmdc` binary. Defaults to `mmdc` found on `$PATH`
-- `--generated-by` / `CONFLUENCE_GENERATED_BY`: Banner text prepended to every page as an info panel. Supports `%{filepath}`, `%{filename}`, `%{filedir}`, `%{filestem}` placeholders. Defaults to a standard auto-generated notice
+- `--generated-by` / `CONFLUENCE_GENERATED_BY`: Banner text prepended to every page as an info panel. Supports `%{filepath}`, `%{filename}`, `%{filedir}`, `%{filestem}` placeholders.
+  Defaults to a standard auto-generated notice. Setting `CONFLUENCE_GENERATED_BY=` (empty string) suppresses the banner without needing `--no-generated-by`
 - `--no-generated-by`: Suppress the auto-generated banner panel
 - `--page-width` / `CONFLUENCE_PAGE_WIDTH`: Set display width for every synced page.
   `full-width` renders content across the full browser width; `default` uses the standard Confluence narrow layout.
@@ -150,9 +142,21 @@ A named container folder with the given title is found under `--parent-id` (or c
 
 ## Development
 
-- Format: `uv run ruff format .`
-- Lint: `uv run ruff check . --fix`
-- Tests: `uv run pytest`
+First-time setup:
+
+```bash
+pip install -e sync_confluence
+pre-commit install
+```
+
+Validation (run from the repository root after every change):
+
+```bash
+pre-commit run --files $(git diff --name-only HEAD; git ls-files --others --exclude-standard)
+cd sync_confluence && pytest
+```
+
+If `pre-commit` auto-fixes any file, re-run the `pre-commit` command before committing.
 
 Tests must not make real network calls; mock or stub all I/O.
 

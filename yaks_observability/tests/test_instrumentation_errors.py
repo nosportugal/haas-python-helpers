@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from yaks_observability.config import Environment, ObservabilityConfig
 from yaks_observability.instrumentation import (

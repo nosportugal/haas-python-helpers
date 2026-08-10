@@ -11,6 +11,22 @@ from yaks_observability import setup
 from yaks_observability.config import Environment, ObservabilityConfig
 
 
+class _FakeExporter:
+    """Stub exporter that never hits the network."""
+
+    def __init__(self, **kw) -> None:  # noqa: ANN003,ARG002
+        pass
+
+    def export(self, batch) -> None:  # noqa: ANN001,ARG002
+        return None
+
+    def shutdown(self) -> None:
+        pass
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:  # noqa: ARG002
+        return True
+
+
 class TestSetup:
     @patch.dict(
         os.environ,
@@ -30,6 +46,18 @@ class TestSetup:
             "OTEL_SERVICE_NAME": "test-svc",
         },
         clear=True,
+    )
+    @patch(
+        "yaks_observability.instrumentation.otlp_traces_http.OTLPSpanExporter",
+        _FakeExporter,
+    )
+    @patch(
+        "yaks_observability.instrumentation.otlp_metrics_http.OTLPMetricExporter",
+        _FakeExporter,
+    )
+    @patch(
+        "opentelemetry.exporter.otlp.proto.http._log_exporter.OTLPLogExporter",
+        _FakeExporter,
     )
     def test_setup_dev_mode(self) -> None:
         app = FastAPI()

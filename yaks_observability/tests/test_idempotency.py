@@ -12,6 +12,19 @@ from yaks_observability.config import Environment, ObservabilityConfig
 from yaks_observability.logging_config import configure_logging
 
 
+class _FakeLogExporter:
+    """Stub exporter that never hits the network."""
+
+    def export(self, records) -> None:  # noqa: ANN001,ARG002
+        return None
+
+    def shutdown(self) -> None:
+        pass
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:  # noqa: ARG002
+        return True
+
+
 class TestConfigureLoggingIdempotency:
     def test_configure_logging_called_twice_no_duplicate_console_handler(
         self, base_config: ObservabilityConfig
@@ -63,8 +76,12 @@ class TestOTLPLogHandlerIdempotency:
 
         try:
             with patch("opentelemetry._logs.set_logger_provider"):
-                provider1 = _create_log_provider(resource, custom)
-                provider2 = _create_log_provider(resource, custom)
+                with patch(
+                    "opentelemetry.exporter.otlp.proto.http._log_exporter.OTLPLogExporter",  # noqa: E501
+                    return_value=_FakeLogExporter(),
+                ):
+                    provider1 = _create_log_provider(resource, custom)
+                    provider2 = _create_log_provider(resource, custom)
 
             otlp_handlers = [
                 h for h in root.handlers if getattr(h, "_yaks_otlp_handler", False)

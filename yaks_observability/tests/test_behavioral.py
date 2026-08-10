@@ -11,6 +11,19 @@ from yaks_observability import setup
 from yaks_observability.config import Environment, ObservabilityConfig
 
 
+class _FakeLogExporter:
+    """Stub exporter that never hits the network."""
+
+    def export(self, records) -> None:  # noqa: ANN001,ARG002
+        return None
+
+    def shutdown(self) -> None:
+        pass
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:  # noqa: ARG002
+        return True
+
+
 class TestOTLPLogDelivery:
     def test_logging_handler_attached_to_root(self) -> None:
         """When OTLP logs are enabled, a LoggingHandler should be on the root logger."""
@@ -45,7 +58,11 @@ class TestOTLPLogDelivery:
         from yaks_observability.instrumentation import _create_log_provider
 
         with patch("opentelemetry._logs.set_logger_provider"):
-            provider = _create_log_provider(resource, custom)
+            with patch(
+                "opentelemetry.exporter.otlp.proto.http._log_exporter.OTLPLogExporter",
+                return_value=_FakeLogExporter(),
+            ):
+                provider = _create_log_provider(resource, custom)
 
         try:
             handler_types = [type(h).__name__ for h in root.handlers]
@@ -91,7 +108,8 @@ class TestOTLPLogDelivery:
         parts = output.strip().split()
         assert len(parts) >= 2
         trace_id = parts[0]
-        assert trace_id != "0" and len(trace_id) == 32
+        assert trace_id != "0"
+        assert len(trace_id) == 32
 
 
 class TestPIISpanProcessor:
@@ -151,13 +169,18 @@ class TestMetricsProviderSet:
 
         from yaks_observability.instrumentation import _build_metrics_provider
 
-        with patch("yaks_observability.instrumentation.metrics.set_meter_provider") as mock_set:
+        with patch(
+            "yaks_observability.instrumentation.metrics.set_meter_provider",
+        ) as mock_set:
             _build_metrics_provider(resource)
 
-        mock_set.assert_not_called()  # _build_metrics_provider doesn't call it; _init_metrics does
+        # _build_metrics_provider doesn't call it; _init_metrics does
+        mock_set.assert_not_called()
 
         app = FastAPI()
-        with patch("yaks_observability.instrumentation.metrics.set_meter_provider") as mock_set:
+        with patch(
+            "yaks_observability.instrumentation.metrics.set_meter_provider",
+        ) as mock_set:
             with patch(
                 "yaks_observability.instrumentation.otlp_metrics_http.OTLPMetricExporter",
             ):

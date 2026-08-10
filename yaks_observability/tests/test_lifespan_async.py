@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
-from collections.abc import AsyncIterator
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI
 
 from yaks_observability.lifespan import (
     _managed_lifespan,
-    attach_lifespan,
     set_lifespan_state,
 )
 import yaks_observability.lifespan as _ls

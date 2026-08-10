@@ -1,0 +1,100 @@
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project]
+name = "yaks-observability"
+version = "1.0.0"
+description = "Production-grade OpenTelemetry observability package for FastAPI apps with environment-aware logging, health filtering, and automatic distributed tracing."
+authors = [
+    { name = "Gustavo Carneiro", email = "gustavo.carneiro@parceiros.nos.pt" },
+    { name = "NOS Team", email = "team@nos.pt" },
+]
+readme = "README.md"
+requires-python = ">=3.13,<4.0"
+license = { text = "MIT" }
+keywords = [
+    "opentelemetry",
+    "observability",
+    "logging",
+    "tracing",
+    "metrics",
+    "fastapi",
+    "otlp",
+    "distributed-tracing",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Monitoring",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Framework :: FastAPI",
+]
+
+dependencies = [
+    "fastapi>=0.115.0",
+    "opentelemetry-api>=1.44.0",
+    "opentelemetry-sdk>=1.44.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.44.0",
+    "opentelemetry-instrumentation-fastapi>=0.65b0",
+    "opentelemetry-instrumentation-logging>=0.65b0",
+    "python-json-logger>=4.1.0",
+]
+
+[project.optional-dependencies]
+downstream = [
+    "opentelemetry-instrumentation-sqlalchemy>=0.65b0",
+    "opentelemetry-instrumentation-httpx>=0.65b0",
+    "opentelemetry-instrumentation-requests>=0.65b0",
+]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.3.0",
+    "pip-audit>=2.6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/nosportugal/haas-python-helpers/tree/main/yaks_observability"
+Documentation = "https://github.com/nosportugal/haas-python-helpers/tree/main/yaks_observability#readme"
+Repository = "https://github.com/nosportugal/haas-python-helpers"
+Issues = "https://github.com/nosportugal/haas-python-helpers/issues"
+
+[tool.poetry]
+packages = [
+    { include = "yaks_observability", from = "src" },
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+preview = true
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "PL", "PT"]
+ignore = ["E203", "PLC2701"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLR2004", "PLR6301", "PLR0913"]
+"src/yaks_observability/instrumentation.py" = ["PLR0402", "PLC0415"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = [
+    "-v",
+    "--cov=src/yaks_observability",
+    "--cov-report=html",
+    "--cov-report=term-missing",
+]

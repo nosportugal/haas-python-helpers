@@ -1,0 +1,92 @@
+"""Structured logging setup with OpenTelemetry correlation.
+
+Uses python-json-logger for JSON output and injects trace_id / span_id
+via the OTEL logging instrumentor.
+"""
+
+from __future__ import annotations
+
+import logging
+import sys
+from typing import TYPE_CHECKING
+
+# python-json-logger moved the module in v4+; suppress deprecation and import safely
+try:
+    from pythonjsonlogger.json import JsonFormatter
+except ImportError:
+    import pythonjsonlogger.jsonlogger
+
+    JsonFormatter = pythonjsonlogger.jsonlogger.JsonFormatter
+
+from .config import ObservabilityConfig
+from .filters import HealthCheckFilter
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+
+class _OtelFormatter(JsonFormatter):
+    """JSON formatter that preserves OTEL-injected trace/span IDs."""
+
+    def add_fields(
+        self,
+        log_record: dict[str, object],
+        record: logging.LogRecord,
+        message_dict: Mapping[str, object],
+    ) -> None:
+        super().add_fields(log_record, record, message_dict)
+        # Ensure OTEL fields are captured if present on the record
+        for attr in ("trace_id", "span_id", "trace_flags", "resource"):
+            val = getattr(record, attr, None)
+            if val is not None:
+                log_record[attr] = val
+
+
+def configure_logging(config: ObservabilityConfig) -> None:
+    """Attach OTEL-instrumented handlers to the root logger.
+
+    - Console handler (text or JSON depending on config).
+    - Uvicorn health-check filter installed on uvicorn.access.
+    """
+    root = logging.getLogger()
+    root.setLevel(config.log_level)
+
+    # Remove pre-existing handlers to avoid double-logging in reloaded workers
+    for handler in root.handlers[:]:
+        root.removeHandler(handler)
+
+    # Console handler
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(config.log_level)
+
+    if config.enable_console_json or config.environment.value == "prod":
+        fmt = (
+            "%(asctime)s %(levelname)s %(name)s %(message)s "
+            "%(trace_id)s %(span_id)s"
+        )
+        stream_handler.setFormatter(_OtelFormatter(fmt))
+    else:
+        fmt = (
+            "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s | "
+            "trace=%(trace_id)s span=%(span_id)s"
+        )
+        stream_handler.setFormatter(logging.Formatter(fmt))
+
+    root.addHandler(stream_handler)
+
+    # Suppress noisy third-party loggers
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    # Attach health-check filter to uvicorn.access
+    uvicorn_access = logging.getLogger("uvicorn.access")
+    if not any(
+        isinstance(f, HealthCheckFilter) for f in uvicorn_access.filters
+    ):
+        uvicorn_access.addFilter(
+            HealthCheckFilter(endpoints=config.health_endpoints)
+        )
+
+    # In testing mode, ensure we still have root logging but no OTLP network calls
+    if config.testing_mode:
+        logging.getLogger("opentelemetry").setLevel(logging.WARNING)

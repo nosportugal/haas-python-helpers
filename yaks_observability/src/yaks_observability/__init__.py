@@ -12,6 +12,7 @@ Usage::
 from __future__ import annotations
 
 from .config import Environment, ObservabilityConfig
+from .resilience import configure_env_defaults, get_batch_processor_kwargs
 from .setup import setup
 
 __version__ = "1.0.0"
@@ -19,6 +20,8 @@ __version__ = "1.0.0"
 __all__ = [
     "Environment",
     "ObservabilityConfig",
+    "configure_env_defaults",
+    "get_batch_processor_kwargs",
     "setup",
     "__version__",
 ]

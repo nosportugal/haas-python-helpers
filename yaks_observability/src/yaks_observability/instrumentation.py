@@ -27,6 +27,7 @@ from opentelemetry.semconv.resource import ResourceAttributes
 from .config import ObservabilityConfig
 from .graceful_degradation import suppress_otel_errors
 from .pii_redaction import PIIRedactionProcessor, PIIRedactingLogProcessor
+from .resilience import get_batch_processor_kwargs, get_exporter_kwargs
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -92,19 +93,25 @@ def _build_tracer_provider(
     return provider
 
 
-def _create_trace_exporter(config: ObservabilityConfig):
-    return otlp_traces_http.OTLPSpanExporter(
-        endpoint=f"{config.otlp_endpoint}/v1/traces",
-        timeout=10,
+def _create_span_processor(exporter):
+    from .resilience import get_batch_processor_kwargs
+
+    kwargs = get_batch_processor_kwargs()
+    return BatchSpanProcessor(
+        exporter,
+        max_queue_size=kwargs["max_queue_size"],
+        max_export_batch_size=kwargs["max_export_batch_size"],
+        schedule_delay_millis=kwargs["schedule_delay_millis"],
     )
 
 
-def _create_span_processor(exporter):
-    return BatchSpanProcessor(
-        exporter,
-        max_queue_size=2048,
-        max_export_batch_size=512,
-        schedule_delay_millis=5000,
+def _create_trace_exporter(config: ObservabilityConfig):
+    from .resilience import get_exporter_kwargs
+
+    kwargs = get_exporter_kwargs()
+    return otlp_traces_http.OTLPSpanExporter(
+        endpoint=f"{config.otlp_endpoint}/v1/traces",
+        **kwargs,
     )
 
 
@@ -138,13 +145,11 @@ def _create_log_provider(
     provider = LoggerProvider(resource=resource)
     exporter = OTLPLogExporter(
         endpoint=f"{config.otlp_endpoint}/v1/logs",
-        timeout=10,
+        **get_exporter_kwargs(),
     )
     processor = BatchLogRecordProcessor(
         exporter,
-        max_queue_size=2048,
-        max_export_batch_size=512,
-        schedule_delay_millis=5000,
+        **get_batch_processor_kwargs(),
     )
     if config.enable_pii_redaction:
         redaction = PIIRedactionProcessor()
@@ -167,9 +172,11 @@ def _init_metrics(
         return None
 
     try:
+        from .resilience import get_exporter_kwargs
+
         exporter = otlp_metrics_http.OTLPMetricExporter(
             endpoint=f"{config.otlp_endpoint}/v1/metrics",
-            timeout=10,
+            **get_exporter_kwargs(),
         )
         reader = PeriodicExportingMetricReader(exporter, export_interval_millis=60000)
         provider = MeterProvider(resource=resource, metric_readers=[reader])

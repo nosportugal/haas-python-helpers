@@ -19,6 +19,7 @@ from .instrumentation import (
 )
 from .lifespan import attach_lifespan, set_lifespan_state
 from .logging_config import configure_logging
+from .resilience import configure_env_defaults
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -57,6 +58,7 @@ def setup(  # noqa: PLR0913
     Returns:
         The resolved :class:`ObservabilityConfig`.
     """
+    configure_env_defaults()
     resolved = config or ObservabilityConfig.from_env()
 
     # 1. Logging basics (console + health filter)

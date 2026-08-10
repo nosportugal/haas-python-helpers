@@ -140,7 +140,6 @@ def _create_log_provider(
     from opentelemetry.exporter.otlp.proto.http._log_exporter import (  # noqa: PLC2701
         OTLPLogExporter,
     )
-    from opentelemetry.sdk._logs import set_logger_provider  # noqa: PLC2701
 
     provider = LoggerProvider(resource=resource)
     exporter = OTLPLogExporter(
@@ -156,10 +155,6 @@ def _create_log_provider(
         processor = PIIRedactingLogProcessor(processor, redaction)
 
     provider.add_log_record_processor(processor)
-    try:
-        set_logger_provider(provider)
-    except ImportError:
-        pass  # newer SDK handles it differently
     return provider
 
 

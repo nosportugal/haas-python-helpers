@@ -73,5 +73,13 @@ class PIIRedactingLogProcessor:
         if hasattr(self._processor, "emit"):
             self._processor.emit(log_data)
         elif hasattr(self._processor, "force_flush"):
-            # Some processors expose different APIs — delegate generically
             self._processor.force_flush()
+
+    def shutdown(self) -> None:
+        if hasattr(self._processor, "shutdown"):
+            self._processor.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        if hasattr(self._processor, "force_flush"):
+            return self._processor.force_flush(timeout_millis)
+        return True

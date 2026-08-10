@@ -25,6 +25,15 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 
+class _SafeFormatter(logging.Formatter):
+    """Formatter that safely handles missing trace_id/span_id on records."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        record.trace_id = getattr(record, "trace_id", "")
+        record.span_id = getattr(record, "span_id", "")
+        return super().format(record)
+
+
 class _OtelFormatter(JsonFormatter):
     """JSON formatter that preserves OTEL-injected trace/span IDs."""
 
@@ -35,7 +44,6 @@ class _OtelFormatter(JsonFormatter):
         message_dict: Mapping[str, object],
     ) -> None:
         super().add_fields(log_record, record, message_dict)
-        # Ensure OTEL fields are captured if present on the record
         for attr in ("trace_id", "span_id", "trace_flags", "resource"):
             val = getattr(record, attr, None)
             if val is not None:
@@ -60,17 +68,14 @@ def configure_logging(config: ObservabilityConfig) -> None:
     stream_handler.setLevel(config.log_level)
 
     if config.enable_console_json or config.environment.value == "prod":
-        fmt = (
-            "%(asctime)s %(levelname)s %(name)s %(message)s "
-            "%(trace_id)s %(span_id)s"
-        )
+        fmt = "%(asctime)s %(levelname)s %(name)s %(message)s %(trace_id)s %(span_id)s"
         stream_handler.setFormatter(_OtelFormatter(fmt))
     else:
         fmt = (
             "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s | "
             "trace=%(trace_id)s span=%(span_id)s"
         )
-        stream_handler.setFormatter(logging.Formatter(fmt))
+        stream_handler.setFormatter(_SafeFormatter(fmt))
 
     root.addHandler(stream_handler)
 

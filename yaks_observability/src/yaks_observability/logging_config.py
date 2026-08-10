@@ -1,7 +1,7 @@
 """Structured logging setup with OpenTelemetry correlation.
 
-Uses python-json-logger for JSON output and injects trace_id / span_id
-via the OTEL logging instrumentor.
+Uses python-json-logger for JSON output and reads trace context injected
+by the OTEL LoggingInstrumentor (``otelTraceID``, ``otelSpanID``).
 """
 
 from __future__ import annotations
@@ -26,11 +26,11 @@ if TYPE_CHECKING:
 
 
 class _SafeFormatter(logging.Formatter):
-    """Formatter that safely handles missing trace_id/span_id on records."""
+    """Formatter that safely handles missing otelTraceID/otelSpanID on records."""
 
     def format(self, record: logging.LogRecord) -> str:
-        record.trace_id = getattr(record, "trace_id", "")
-        record.span_id = getattr(record, "span_id", "")
+        record.otelTraceID = getattr(record, "otelTraceID", "")
+        record.otelSpanID = getattr(record, "otelSpanID", "")
         return super().format(record)
 
 
@@ -44,7 +44,7 @@ class _OtelFormatter(JsonFormatter):
         message_dict: Mapping[str, object],
     ) -> None:
         super().add_fields(log_record, record, message_dict)
-        for attr in ("trace_id", "span_id", "trace_flags", "resource"):
+        for attr in ("otelTraceID", "otelSpanID", "otelTraceFlags", "otelServiceName"):
             val = getattr(record, attr, None)
             if val is not None:
                 log_record[attr] = val
@@ -59,21 +59,27 @@ def configure_logging(config: ObservabilityConfig) -> None:
     root = logging.getLogger()
     root.setLevel(config.log_level)
 
-    # Remove pre-existing handlers to avoid double-logging in reloaded workers
-    for handler in root.handlers[:]:
-        root.removeHandler(handler)
+    # Check if we've already configured; avoid clobbering host app's handlers
+    if any(
+        getattr(h, "_yaks_handler", False) for h in root.handlers
+    ):
+        return
 
     # Console handler
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setLevel(config.log_level)
+    stream_handler._yaks_handler = True  # type: ignore[attr-defined]
 
     if config.enable_console_json or config.environment.value == "prod":
-        fmt = "%(asctime)s %(levelname)s %(name)s %(message)s %(trace_id)s %(span_id)s"
+        fmt = (
+            "%(asctime)s %(levelname)s %(name)s %(message)s "
+            "%(otelTraceID)s %(otelSpanID)s"
+        )
         stream_handler.setFormatter(_OtelFormatter(fmt))
     else:
         fmt = (
             "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s | "
-            "trace=%(trace_id)s span=%(span_id)s"
+            "trace=%(otelTraceID)s span=%(otelSpanID)s"
         )
         stream_handler.setFormatter(_SafeFormatter(fmt))
 

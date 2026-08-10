@@ -72,6 +72,9 @@ packages = [
     { include = "yaks_observability", from = "src" },
 ]
 
+[tool.poetry.group.dev.dependencies]
+httpx = "^0.28.1"
+
 [tool.ruff]
 line-length = 88
 target-version = "py313"

@@ -3,9 +3,26 @@
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlsplit
 
 # Minimum index for the path argument in uvicorn.access log record.args
 _UVICORN_PATH_INDEX = 2
+
+
+def _match_health_path(raw_path: str, endpoints: tuple[str, ...]) -> bool:
+    """Strip query strings and trailing slashes, then match path prefix.
+
+    Args:
+        raw_path: The raw request path (may include query string).
+        endpoints: Tuple of known health endpoint prefixes.
+
+    Returns:
+        True if the path matches a known health endpoint.
+    """
+    # Strip query strings: /health?foo=bar -> /health
+    path = urlsplit(raw_path).path
+    stripped = path.rstrip("/") or "/"
+    return stripped in endpoints
 
 
 class HealthCheckFilter(logging.Filter):
@@ -36,8 +53,7 @@ class HealthCheckFilter(logging.Filter):
         min_args_needed = _UVICORN_PATH_INDEX + 1
         if len(args) >= min_args_needed and isinstance(args[_UVICORN_PATH_INDEX], str):
             path: str = args[_UVICORN_PATH_INDEX]
-            stripped = path.rstrip("/")
-            if path in self.endpoints or stripped in self.endpoints:
+            if _match_health_path(path, self.endpoints):
                 return False
         return True
 
@@ -66,6 +82,6 @@ class HealthCheckUrlFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         path = getattr(record, self.attr_name, None)
         if isinstance(path, str):
-            if path in self.endpoints or path.rstrip("/") in self.endpoints:
+            if _match_health_path(path, self.endpoints):
                 return False
         return True

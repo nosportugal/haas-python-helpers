@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING
 
-from opentelemetry import trace
+from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.http import (
     metric_exporter as otlp_metrics_http,
     trace_exporter as otlp_traces_http,
 )
-from opentelemetry.sdk._logs import LoggerProvider
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
@@ -25,8 +26,13 @@ from opentelemetry.sdk.trace.sampling import (
 from opentelemetry.semconv.resource import ResourceAttributes
 
 from .config import ObservabilityConfig
+from .filters import HealthCheckUrlFilter
 from .graceful_degradation import suppress_otel_errors
-from .pii_redaction import PIIRedactionProcessor, PIIRedactingLogProcessor
+from .pii_redaction import (
+    PIIRedactionProcessor,
+    PIIRedactingLogProcessor,
+    PIIRedactingSpanProcessor,
+)
 from .resilience import get_batch_processor_kwargs, get_exporter_kwargs
 
 if TYPE_CHECKING:
@@ -41,8 +47,9 @@ def _build_resource(config: ObservabilityConfig) -> Resource:
         ResourceAttributes.SERVICE_NAME: config.service_name,
         ResourceAttributes.DEPLOYMENT_ENVIRONMENT: config.environment.value,
     }
-    if config.service_name and config.service_name != "unknown-service":
-        attrs[ResourceAttributes.SERVICE_NAMESPACE] = "nos"
+    namespace = config.service_namespace or os.getenv("OTEL_SERVICE_NAMESPACE", "")
+    if namespace:
+        attrs[ResourceAttributes.SERVICE_NAMESPACE] = namespace
     attrs.update(config.extra_resource_attributes)
     return Resource.create(attrs)
 
@@ -90,6 +97,10 @@ def _build_tracer_provider(
     exporter = _create_trace_exporter(config)
     processor = _create_span_processor(exporter)
     provider.add_span_processor(processor)
+    if config.enable_pii_redaction:
+        provider.add_span_processor(
+            PIIRedactingSpanProcessor(PIIRedactionProcessor())
+        )
     return provider
 
 
@@ -109,10 +120,10 @@ def _create_trace_exporter(config: ObservabilityConfig):
     from .resilience import get_exporter_kwargs
 
     kwargs = get_exporter_kwargs()
-    return otlp_traces_http.OTLPSpanExporter(
-        endpoint=f"{config.otlp_endpoint}/v1/traces",
-        **kwargs,
-    )
+    # Let the SDK derive the full signal endpoint from standard env vars
+    # (OTEL_EXPORTER_OTLP_TRACES_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT).
+    # We do not pass endpoint= manually to avoid double path issues.
+    return otlp_traces_http.OTLPSpanExporter(**kwargs)
 
 
 def _init_logging(
@@ -129,7 +140,7 @@ def _init_logging(
         logger.warning("OTLP logging initialization failed: %s", exc)
         return None
     else:
-        logger.debug("OTLP logging initialized.")
+        logger.debug("OTLP logging initialized via LoggerProvider.")
         return provider
 
 
@@ -137,13 +148,13 @@ def _create_log_provider(
     resource: Resource,
     config: ObservabilityConfig,
 ) -> LoggerProvider:
+    from opentelemetry._logs import set_logger_provider
     from opentelemetry.exporter.otlp.proto.http._log_exporter import (  # noqa: PLC2701
         OTLPLogExporter,
     )
 
     provider = LoggerProvider(resource=resource)
     exporter = OTLPLogExporter(
-        endpoint=f"{config.otlp_endpoint}/v1/logs",
         **get_exporter_kwargs(),
     )
     processor = BatchLogRecordProcessor(
@@ -155,6 +166,15 @@ def _create_log_provider(
         processor = PIIRedactingLogProcessor(processor, redaction)
 
     provider.add_log_record_processor(processor)
+    set_logger_provider(provider)
+
+    # Bridge stdlib logging → OTLP via LoggingHandler on root logger
+    handler = LoggingHandler(level=logging.DEBUG, logger_provider=provider)
+    handler.addFilter(
+        HealthCheckUrlFilter(endpoints=config.health_endpoints)
+    )
+    logging.getLogger().addHandler(handler)
+
     return provider
 
 
@@ -167,19 +187,21 @@ def _init_metrics(
         return None
 
     try:
-        from .resilience import get_exporter_kwargs
-
-        exporter = otlp_metrics_http.OTLPMetricExporter(
-            endpoint=f"{config.otlp_endpoint}/v1/metrics",
-            **get_exporter_kwargs(),
-        )
-        reader = PeriodicExportingMetricReader(exporter, export_interval_millis=60000)
-        provider = MeterProvider(resource=resource, metric_readers=[reader])
+        provider = _build_metrics_provider(resource)
+        metrics.set_meter_provider(provider)
         logger.debug("Metrics initialized.")
         return provider
     except Exception as exc:  # noqa: BLE001
         logger.warning("Metrics initialization failed: %s", exc)
         return None
+
+
+def _build_metrics_provider(resource: Resource) -> MeterProvider:
+    from .resilience import get_exporter_kwargs
+
+    exporter = otlp_metrics_http.OTLPMetricExporter(**get_exporter_kwargs())
+    reader = PeriodicExportingMetricReader(exporter, export_interval_millis=60000)
+    return MeterProvider(resource=resource, metric_readers=[reader])
 
 
 def instrument_fastapi(

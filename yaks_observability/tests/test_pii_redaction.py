@@ -33,3 +33,22 @@ class TestPIIRedactionProcessor:
         assert result["service"] == "foo"
         assert result["password"] == "[REDACTED]"
         assert result["status"] == 200
+
+    def test_recursive_scrub(self) -> None:
+        r = PIIRedactionProcessor()
+        data = {
+            "service": "foo",
+            "nested": {"password": "secret", "status": 200},
+            "flat": "ok",
+        }
+        result = r.scrub_dict(data)
+        assert result["service"] == "foo"
+        assert result["nested"]["password"] == "[REDACTED]"
+        assert result["nested"]["status"] == 200
+        assert result["flat"] == "ok"
+
+    def test_word_boundary_author_not_redacted(self) -> None:
+        r = PIIRedactionProcessor()
+        assert r.scrub_value("author", "Jane") == "Jane"
+        assert r.scrub_value("session_id", "abc") == "[REDACTED]"
+        assert r.scrub_value("authorization", "Bearer xyz") == "[REDACTED]"

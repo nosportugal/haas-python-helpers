@@ -70,6 +70,7 @@ class ObservabilityConfig:
     enable_otlp_metrics: bool
     enable_pii_redaction: bool
     testing_mode: bool
+    service_namespace: str = ""
     extra_resource_attributes: dict[str, str] = field(default_factory=dict)
 
     # ruff: ignore PLR0914 (too-many-locals) — env parsing inherently has many variables
@@ -99,9 +100,12 @@ class ObservabilityConfig:
         raw_attrs = os.getenv("OTEL_RESOURCE_ATTRIBUTES", "")
         extra_resource_attributes = _parse_resource_attrs(raw_attrs)
 
+        service_namespace = os.getenv("OTEL_SERVICE_NAMESPACE", "")
+
         return cls(
             environment=environment,
             service_name=service_name,
+            service_namespace=service_namespace,
             otlp_endpoint=otlp_endpoint,
             log_level=log_level,
             sampler=sampler,

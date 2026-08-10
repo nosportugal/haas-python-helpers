@@ -115,3 +115,25 @@ class TestHealthCheckUrlFilter:
             exc_info=None,
         )
         assert f.filter(record) is True
+
+    def test_query_string_stripped(self) -> None:
+        f = HealthCheckUrlFilter()
+        record = logging.LogRecord(
+            name="app", level=logging.INFO, pathname="", lineno=1,
+            msg="request", args=(), exc_info=None,
+        )
+        record.http_target = "/health?foo=bar"
+        assert f.filter(record) is False
+
+    def test_trailing_slash_match(self) -> None:
+        f = HealthCheckFilter()
+        record = logging.LogRecord(
+            name="uvicorn.access",
+            level=logging.INFO,
+            pathname="",
+            lineno=1,
+            msg='%s - "%s %s HTTP/%s" %d',
+            args=("127.0.0.1", "GET", "/health/", "1.1", 200),
+            exc_info=None,
+        )
+        assert f.filter(record) is False

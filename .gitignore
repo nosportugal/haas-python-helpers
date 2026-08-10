@@ -57,3 +57,4 @@ junit*.xml
 *~
 .idea/
 .vscode/
+*.py,cover

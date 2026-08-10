@@ -52,3 +52,20 @@ class TestPIIRedactionProcessor:
         assert r.scrub_value("author", "Jane") == "Jane"
         assert r.scrub_value("session_id", "abc") == "[REDACTED]"
         assert r.scrub_value("authorization", "Bearer xyz") == "[REDACTED]"
+
+    def test_scrub_dict_recurses_into_lists(self) -> None:
+        r = PIIRedactionProcessor()
+        data = {
+            "service": "foo",
+            "users": [
+                {"email": "a@b.com", "status": "active"},
+                {"email": "c@d.com", "status": "inactive"},
+            ],
+            "tags": ["ok", "fine"],
+        }
+        result = r.scrub_dict(data)
+        assert result["service"] == "foo"
+        assert result["users"][0]["email"] == "[REDACTED]"
+        assert result["users"][0]["status"] == "active"
+        assert result["users"][1]["email"] == "[REDACTED]"
+        assert result["tags"] == ["ok", "fine"]

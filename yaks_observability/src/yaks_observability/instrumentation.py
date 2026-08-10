@@ -26,12 +26,11 @@ from opentelemetry.sdk.trace.sampling import (
 from opentelemetry.semconv.resource import ResourceAttributes
 
 from .config import ObservabilityConfig
-from .filters import HealthCheckUrlFilter
 from .graceful_degradation import suppress_otel_errors
 from .pii_redaction import (
     PIIRedactionProcessor,
-    PIIRedactingLogProcessor,
-    PIIRedactingSpanProcessor,
+    RedactingLogExporter,
+    RedactingSpanExporter,
 )
 from .resilience import get_batch_processor_kwargs, get_exporter_kwargs
 
@@ -95,12 +94,10 @@ def _build_tracer_provider(
     sampler = _resolve_sampler(config)
     provider = TracerProvider(resource=resource, sampler=sampler)
     exporter = _create_trace_exporter(config)
+    if config.enable_pii_redaction:
+        exporter = RedactingSpanExporter(exporter, PIIRedactionProcessor())
     processor = _create_span_processor(exporter)
     provider.add_span_processor(processor)
-    if config.enable_pii_redaction:
-        provider.add_span_processor(
-            PIIRedactingSpanProcessor(PIIRedactionProcessor())
-        )
     return provider
 
 
@@ -121,8 +118,10 @@ def _create_trace_exporter(config: ObservabilityConfig):
 
     kwargs = get_exporter_kwargs()
     # Let the SDK derive the full signal endpoint from standard env vars
-    # (OTEL_EXPORTER_OTLP_TRACES_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT).
-    # We do not pass endpoint= manually to avoid double path issues.
+    # (OTEL_EXPORTER_OTLP_TRACES_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT)
+    # unless an explicit endpoint is configured.
+    if config.otlp_endpoint:
+        kwargs["endpoint"] = config.otlp_endpoint
     return otlp_traces_http.OTLPSpanExporter(**kwargs)
 
 
@@ -154,26 +153,29 @@ def _create_log_provider(
     )
 
     provider = LoggerProvider(resource=resource)
-    exporter = OTLPLogExporter(
-        **get_exporter_kwargs(),
-    )
+    exporter_kwargs = get_exporter_kwargs()
+    if config.otlp_endpoint:
+        exporter_kwargs["endpoint"] = config.otlp_endpoint
+    exporter = OTLPLogExporter(**exporter_kwargs)
+    if config.enable_pii_redaction:
+        exporter = RedactingLogExporter(exporter, PIIRedactionProcessor())
     processor = BatchLogRecordProcessor(
         exporter,
         **get_batch_processor_kwargs(),
     )
-    if config.enable_pii_redaction:
-        redaction = PIIRedactionProcessor()
-        processor = PIIRedactingLogProcessor(processor, redaction)
 
     provider.add_log_record_processor(processor)
     set_logger_provider(provider)
 
-    # Bridge stdlib logging → OTLP via LoggingHandler on root logger
+    # Bridge stdlib logging → OTLP via LoggingHandler on root logger.
+    # Guard against duplicate handlers on repeated setup() calls.
+    root = logging.getLogger()
+    if any(getattr(h, "_yaks_otlp_handler", False) for h in root.handlers):
+        return provider
+
     handler = LoggingHandler(level=logging.DEBUG, logger_provider=provider)
-    handler.addFilter(
-        HealthCheckUrlFilter(endpoints=config.health_endpoints)
-    )
-    logging.getLogger().addHandler(handler)
+    handler._yaks_otlp_handler = True  # type: ignore[attr-defined]
+    root.addHandler(handler)
 
     return provider
 
@@ -187,7 +189,7 @@ def _init_metrics(
         return None
 
     try:
-        provider = _build_metrics_provider(resource)
+        provider = _build_metrics_provider(resource, config)
         metrics.set_meter_provider(provider)
         logger.debug("Metrics initialized.")
         return provider
@@ -196,10 +198,22 @@ def _init_metrics(
         return None
 
 
-def _build_metrics_provider(resource: Resource) -> MeterProvider:
+def _build_metrics_provider(
+    resource: Resource, config: ObservabilityConfig | None = None
+) -> MeterProvider:
+    """Build the metrics provider.
+
+    Note: this package intentionally defines no custom instruments here.
+    Metrics are produced by ``FastAPIInstrumentor`` (request duration, count,
+    etc.) via auto-instrumentation; this function only wires the exporter and
+    reader.
+    """
     from .resilience import get_exporter_kwargs
 
-    exporter = otlp_metrics_http.OTLPMetricExporter(**get_exporter_kwargs())
+    kwargs = get_exporter_kwargs()
+    if config is not None and config.otlp_endpoint:
+        kwargs["endpoint"] = config.otlp_endpoint
+    exporter = otlp_metrics_http.OTLPMetricExporter(**kwargs)
     reader = PeriodicExportingMetricReader(exporter, export_interval_millis=60000)
     return MeterProvider(resource=resource, metric_readers=[reader])
 

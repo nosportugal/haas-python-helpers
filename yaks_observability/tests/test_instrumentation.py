@@ -32,9 +32,11 @@ class TestTracingInMemory:
         provider = TracerProvider()
         memory_exporter = InMemorySpanExporter()
         provider.add_span_processor(SimpleSpanProcessor(memory_exporter))
-        trace.set_tracer_provider(provider)
 
-        tracer = trace.get_tracer(__name__)
+        # Use an explicit tracer_provider instead of the process-global one:
+        # OTEL only allows set_tracer_provider() to succeed once per process,
+        # so relying on the global provider makes this test order-dependent.
+        tracer = trace.get_tracer(__name__, tracer_provider=provider)
         with tracer.start_as_current_span("test_operation") as span:
             span.set_attribute("test.id", "42")
 

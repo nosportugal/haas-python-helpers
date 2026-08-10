@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from fastapi import FastAPI
 
@@ -97,46 +97,32 @@ class TestOTLPLogDelivery:
 class TestPIISpanProcessor:
     def test_span_processor_receives_redaction(self) -> None:
         from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
         from opentelemetry.trace import get_tracer
 
+        from tests._otel_helpers import InMemorySpanExporter
         from yaks_observability.pii_redaction import (
             PIIRedactionProcessor,
-            PIIRedactingSpanProcessor,
+            RedactingSpanExporter,
         )
 
+        inner = InMemorySpanExporter()
+        exporter = RedactingSpanExporter(inner, PIIRedactionProcessor())
+
         provider = TracerProvider()
-        provider.add_span_processor(
-            PIIRedactingSpanProcessor(PIIRedactionProcessor())
-        )
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
         tracer = get_tracer(__name__, tracer_provider=provider)
 
         with tracer.start_as_current_span("test") as span:
             span.set_attribute("user.id", "123")
             span.set_attribute("password", "secret")
 
-        # After on_end, attributes should be scrubbed
-        # (SpanProcessor acts before export)
-        # We verify by capturing the export side via a custom exporter
-        exporter = MagicMock()
-        exporter.export.return_value = True
-        provider2 = TracerProvider()
-        provider2.add_span_processor(
-            PIIRedactingSpanProcessor(PIIRedactionProcessor())
-        )
-        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        provider.force_flush()
 
-        provider2.add_span_processor(SimpleSpanProcessor(exporter))
-        tracer2 = get_tracer(__name__ + "2", tracer_provider=provider2)
-
-        with tracer2.start_as_current_span("test2") as span:
-            span.set_attribute("password", "secret")
-
-        provider2.force_flush()
-
-        assert exporter.export.called
-        batch = exporter.export.call_args[0][0]
-        span_obj = batch[0]
-        assert span_obj.attributes["password"] == "[REDACTED]"
+        spans = inner.get_finished_spans()
+        assert len(spans) == 1
+        assert spans[0].attributes["password"] == "[REDACTED]"
+        assert spans[0].attributes["user.id"] == "123"
 
 
 class TestMetricsProviderSet:

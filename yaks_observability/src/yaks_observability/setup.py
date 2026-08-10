@@ -80,7 +80,9 @@ def setup(  # noqa: PLR0913
             LoggingInstrumentor,
         )
 
-        LoggingInstrumentor().instrument(inject_trace_context=True)
+        if not getattr(logging, "_yaks_logging_instrumented", False):
+            LoggingInstrumentor().instrument(inject_trace_context=True)
+            logging._yaks_logging_instrumented = True  # type: ignore[attr-defined]
 
         log_provider = _init_logging(resolved, resource)
         metric_provider = _init_metrics(resolved, resource)

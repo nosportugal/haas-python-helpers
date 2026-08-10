@@ -57,7 +57,7 @@ def configure_logging(config: ObservabilityConfig) -> None:
     - Uvicorn health-check filter installed on uvicorn.access.
     """
     root = logging.getLogger()
-    root.setLevel(config.log_level)
+    root.setLevel(logging.DEBUG)
 
     # Check if we've already configured; avoid clobbering host app's handlers
     if any(

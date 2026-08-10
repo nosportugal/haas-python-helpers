@@ -70,7 +70,7 @@ class PIIRedactingLogProcessor:
             attrs = log_data.log_record.attributes
             if isinstance(attrs, dict):
                 log_data.log_record.attributes = self._redaction.scrub_dict(attrs)
-        if hasattr(self._processor, "emit"):
+        if hasattr(self._processor, "emit") and callable(self._processor.emit):
             self._processor.emit(log_data)
         elif hasattr(self._processor, "force_flush"):
             self._processor.force_flush()

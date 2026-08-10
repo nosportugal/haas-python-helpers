@@ -1,0 +1,85 @@
+> """PII / sensitive-field redaction before OTLP export.
+  
+> Allow-list safe: unknown fields are scrubbed by default unless explicitly marked safe.
+> This prevents accidental PII leakage when new fields are added.
+> """
+  
+> from __future__ import annotations
+  
+> import re
+  
+  
+  # Field names considered sensitive (case-insensitive matching)
+> _SENSITIVE_PATTERNS: tuple[re.Pattern[str], ...] = (
+>     re.compile(r"password", re.IGNORECASE),
+>     re.compile(r"token", re.IGNORECASE),
+>     re.compile(r"secret", re.IGNORECASE),
+>     re.compile(r"api[_\-]?key", re.IGNORECASE),
+>     re.compile(r"authorization", re.IGNORECASE),
+>     re.compile(r"auth", re.IGNORECASE),
+>     re.compile(r"cookie", re.IGNORECASE),
+>     re.compile(r"session", re.IGNORECASE),
+>     re.compile(r"email", re.IGNORECASE),
+>     re.compile(r"phone", re.IGNORECASE),
+>     re.compile(r"ssn", re.IGNORECASE),
+>     re.compile(r"credit[_\-]?card", re.IGNORECASE),
+>     re.compile(r"cvv", re.IGNORECASE),
+>     re.compile(r"iban", re.IGNORECASE),
+> )
+  
+> _REDACTED = "[REDACTED]"
+  
+  
+> class PIIRedactionProcessor:
+>     """Scrub sensitive keys from log attributes / trace attributes."""
+  
+>     def __init__(self, extra_safe_keys: set[str] | None = None) -> None:
+>         self.safe_keys: set[str] = set(extra_safe_keys or ())
+  
+>     def is_safe(self, key: str) -> bool:
+>         if key in self.safe_keys:
+>             return True
+>         return not any(p.search(key) for p in _SENSITIVE_PATTERNS)
+  
+>     def scrub_dict(self, data: dict) -> dict:
+>         """Return a shallow copy with sensitive keys redacted."""
+>         return {
+>             k: _REDACTED if not self.is_safe(k) else v
+>             for k, v in data.items()
+>         }
+  
+>     def scrub_value(self, key: str, value: object) -> object:
+>         return value if self.is_safe(key) else _REDACTED
+  
+  
+> class PIIRedactingLogProcessor:
+>     """Wrap an OTEL LogRecordProcessor to redact attributes before export.
+  
+>     Not a true OTEL Processor — we use it as a decorator around the batch
+>     processor or inside custom export hooks where supported.
+>     """
+  
+>     def __init__(self, processor: object, redaction: PIIRedactionProcessor) -> None:
+>         self._processor = processor
+>         self._redaction = redaction
+  
+>     def emit(self, log_data: object) -> None:
+!         if hasattr(log_data, "log_record") and hasattr(
+!             log_data.log_record, "attributes"
+!         ):
+!             attrs = log_data.log_record.attributes
+!             if isinstance(attrs, dict):
+!                 log_data.log_record.attributes = self._redaction.scrub_dict(attrs)
+!         if hasattr(self._processor, "emit"):
+!             self._processor.emit(log_data)
+!         elif hasattr(self._processor, "force_flush"):
+!             self._processor.force_flush()
+  
+>     def shutdown(self) -> None:
+!         if hasattr(self._processor, "shutdown"):
+!             self._processor.shutdown()
+  
+>     def force_flush(self, timeout_millis: int = 30000) -> bool:
+!         if hasattr(self._processor, "force_flush"):
+!             return self._processor.force_flush(timeout_millis)
+!         return True

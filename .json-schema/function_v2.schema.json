@@ -1,194 +1,234 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/nosportugal/haas-gcp-functions/function_v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Schema for validating GCP function configurations (v2)",
-  "type": "object",
   "properties": {
     "functions": {
-      "type": "array",
       "description": "List of functions to be deployed",
+      "errorMessage": "'functions' property must be a non-empty array of function objects",
       "items": {
-        "type": "object",
         "properties": {
-          "name": {
-            "type": "string",
-            "description": "Name of the function",
-            "errorMessage": "'name' is a required property and must be a string representing the function's name"
-          },
-          "version": {
-            "type": "integer",
-            "enum": [2],
-            "description": "Version of the function configuration. Must be 2 for this schema",
-            "errorMessage": "'version' is a required property and must be set to 1 or 2"
-          },
-          "source_folder": {
-            "type": "string",
-            "description": "Relative path to the folder containing function code",
-            "errorMessage": "'source_folder' is a required property and must be a string specifying the function's source folder"
+          "build_config": {
+            "description": "Build configuration settings for the function",
+            "errorMessage": "'build_config' is a required property and must include 'runtime' and 'entry_point'",
+            "properties": {
+              "entry_point": {
+                "description": "Entry point for the function (e.g., main function to execute)",
+                "errorMessage": "'entry_point' is required and must be a string representing the main function entry point",
+                "type": "string"
+              },
+              "environment_variables": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Environment variables for the function, defined as key-value pairs",
+                "errorMessage": "'environment_variables' must be an object with key-value pairs if provided or must be omitted",
+                "type": "object"
+              },
+              "runtime": {
+                "description": "Runtime environment for the function, e.g., python38",
+                "errorMessage": "'runtime' is required and must specify the function's runtime as a string",
+                "type": "string"
+              }
+            },
+            "required": [
+              "runtime",
+              "entry_point"
+            ],
+            "type": "object"
           },
           "description": {
-            "type": "string",
             "description": "Description of the function",
-            "errorMessage": "'description' property must be a string if provided or must be omitted"
-          },
-          "build_config": {
-            "type": "object",
-            "description": "Build configuration settings for the function",
-            "properties": {
-              "runtime": {
-                "type": "string",
-                "description": "Runtime environment for the function, e.g., python38",
-                "errorMessage": "'runtime' is required and must specify the function's runtime as a string"
-              },
-              "entry_point": {
-                "type": "string",
-                "description": "Entry point for the function (e.g., main function to execute)",
-                "errorMessage": "'entry_point' is required and must be a string representing the main function entry point"
-              },
-              "environment_variables": {
-                "type": "object",
-                "description": "Environment variables for the function, defined as key-value pairs",
-                "additionalProperties": { "type": "string" },
-                "errorMessage": "'environment_variables' must be an object with key-value pairs if provided or must be omitted"
-              }
-            },
-            "required": ["runtime", "entry_point"],
-            "errorMessage": "'build_config' is a required property and must include 'runtime' and 'entry_point'"
-          },
-          "service_config": {
-            "type": "object",
-            "description": "Service configuration settings for the function",
-            "properties": {
-              "timeout_seconds": {
-                "type": "integer",
-                "description": "Execution timeout for the function in seconds",
-                "default": 60,
-                "errorMessage": "'timeout_seconds' must be an integer if provided or must be omitted"
-              },
-              "available_memory": {
-                "type": "string",
-                "description": "Memory allocated to the function, e.g., '128Mi' for 128 MB",
-                "pattern": "^[0-9]+(k|M|G|Mi|Gi)$",
-                "default": "256Mi",
-                "errorMessage": "'available_memory' must be a string specifying memory (e.g., '128Mi') if provided or must be omitted"
-              },
-              "max_instance_request_concurrency": {
-                "type": "integer",
-                "description": "Maximum number of concurrent requests allowed per instance",
-                "default": 1,
-                "errorMessage": "'max_instance_request_concurrency' and must be an integer"
-              },
-              "available_cpu": {
-                "type": "string",
-                "description": "Number of CPUs allocated to the function",
-                "errorMessage": "'available_cpu' must be a string if provided or must be omitted"
-              },
-              "environment_variables": {
-                "type": "object",
-                "description": "Build environment variables for the function, defined as key-value pairs",
-                "additionalProperties": { "type": ["string", "integer", "boolean"] },
-                "errorMessage": "'environment_variables' must be an object with key-value pairs of strings, integers, or booleans if provided or must be omitted"
-              },
-              "max_instance_count": {
-                "type": "integer",
-                "description": "Maximum number of instances allowed for the function",
-                "errorMessage": "'max_instance_count' must be an integer if provided or must be omitted"
-              },
-              "min_instance_count": {
-                "type": "integer",
-                "description": "Minimum number of instances to keep warm for the function",
-                "errorMessage": "'min_instance_count' must be an integer if provided or must be omitted"
-              },
-              "vpc_connector": {
-                "type": "string",
-                "description": "VPC connector to use, if applicable",
-                "errorMessage": "'vpc_connector' must be a string if provided or must be omitted"
-              },
-              "vpc_connector_egress_settings": {
-                "type": "string",
-                "description": "Egress settings for the VPC connector",
-                "enum": ["VPC_CONNECTOR_EGRESS_SETTINGS_UNSPECIFIED", "PRIVATE_RANGES_ONLY", "ALL_TRAFFIC"],
-                "errorMessage": "'vpc_connector_egress_settings' must be one of 'VPC_CONNECTOR_EGRESS_SETTINGS_UNSPECIFIED', 'PRIVATE_RANGES_ONLY' or 'ALL_TRAFFIC' if provided or must be omitted"
-              },
-              "ingress_settings": {
-                "type": "string",
-                "description": "Ingress settings to control traffic access to the function",
-                "enum": ["ALLOW_ALL", "ALLOW_INTERNAL_ONLY", "ALLOW_INTERNAL_AND_GCLB"],
-                "default": "ALLOW_ALL",
-                "errorMessage": "'ingress_settings' must be one of 'ALLOW_ALL', 'ALLOW_INTERNAL_ONLY' or 'ALLOW_INTERNAL_AND_GCLB' if provided or must be omitted"
-              },
-              "all_traffic_on_latest_revision": {
-                "type": "boolean",
-                "description": "If true, 100% of traffic is routed to the latest revision",
-                "default": true,
-                "errorMessage": "'all_traffic_on_latest_revision' must be a boolean if provided or must be omitted"
-              },
-              "secret_environment_variables": {
-                "type": "array",
-                "description": "Secret environment variables for the function, defined as an array of secrets",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "key": {
-                      "type": "string",
-                      "description": "Name of the environment variable that holds the secret",
-                      "errorMessage": "'key' 'secret_environment_variables' is required and must be a string"
-                    },
-                    "secret": {
-                      "type": "string",
-                      "description": "Name of the secret resource to retrieve",
-                      "errorMessage": "'secret' 'secret_environment_variables' is required and must be a string"
-                    },
-                    "version": {
-                      "type": "string",
-                      "description": "Version of the secret to use, e.g., 'latest' or a numeric version string",
-                      "pattern": "^(latest|[0-9]+)$",
-                      "errorMessage": "'version' is required and must be either 'latest' or a numeric string "
-                    }
-                  },
-                  "required": ["key", "secret", "version"],
-                  "errorMessage": "Each object in 'secret_environment_variables' must include 'key', 'secret', and 'version'"
-                },
-                "minItems": 1,
-                "errorMessage": "'secret_environment_variables' must be a non-empty array of objects if provided or must be omitted"
-              }
-            },
-            "errorMessage": "'service_config' must not be empty if provided or must be omitted"
+            "errorMessage": "'description' property must be a string if provided or must be omitted",
+            "type": "string"
           },
           "event_trigger": {
-            "type": "object",
+            "additionalProperties": false,
             "description": "Event trigger for the function. Should be omitted if triggered by an HTTP request",
+            "errorMessage": "'event_trigger' property must include 'event_type' and may include 'retry_policy'",
             "properties": {
               "event_type": {
-                "type": "string",
                 "description": "Type of event that triggers the function, e.g., 'google.storage.object.finalize'",
-                "errorMessage": "'event_type' is required and must be a string"
+                "errorMessage": "'event_type' is required and must be a string",
+                "type": "string"
               },
               "retry_policy": {
-                "type": "string",
                 "description": "Retry policy for the event trigger, if applicable",
-                "enum": ["RETRY_POLICY_UNSPECIFIED", "RETRY_POLICY_DO_NOT_RETRY", "RETRY_POLICY_RETRY"],
-                "errorMessage": "'retry_policy' must be a string if provided or must be omitted"
+                "enum": [
+                  "RETRY_POLICY_UNSPECIFIED",
+                  "RETRY_POLICY_DO_NOT_RETRY",
+                  "RETRY_POLICY_RETRY"
+                ],
+                "errorMessage": "'retry_policy' must be a string if provided or must be omitted",
+                "type": "string"
               }
             },
-            "required": ["event_type"],
-            "additionalProperties": false,
-            "errorMessage": "'event_trigger' property must include 'event_type' and may include 'retry_policy'"
+            "required": [
+              "event_type"
+            ],
+            "type": "object"
           },
           "labels": {
-            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
             "description": "Labels for the function, defined as key-value pairs for metadata",
-            "additionalProperties": { "type": "string" },
-            "errorMessage": "'labels' property must be an object with key-value pairs of strings if provided or must be omitted"
+            "errorMessage": "'labels' property must be an object with key-value pairs of strings if provided or must be omitted",
+            "type": "object"
+          },
+          "name": {
+            "description": "Name of the function",
+            "errorMessage": "'name' is a required property and must be a string representing the function's name",
+            "type": "string"
+          },
+          "service_config": {
+            "description": "Service configuration settings for the function",
+            "errorMessage": "'service_config' must not be empty if provided or must be omitted",
+            "properties": {
+              "all_traffic_on_latest_revision": {
+                "default": true,
+                "description": "If true, 100% of traffic is routed to the latest revision",
+                "errorMessage": "'all_traffic_on_latest_revision' must be a boolean if provided or must be omitted",
+                "type": "boolean"
+              },
+              "available_cpu": {
+                "description": "Number of CPUs allocated to the function",
+                "errorMessage": "'available_cpu' must be a string if provided or must be omitted",
+                "type": "string"
+              },
+              "available_memory": {
+                "default": "256Mi",
+                "description": "Memory allocated to the function, e.g., '128Mi' for 128 MB",
+                "errorMessage": "'available_memory' must be a string specifying memory (e.g., '128Mi') if provided or must be omitted",
+                "pattern": "^[0-9]+(k|M|G|Mi|Gi)$",
+                "type": "string"
+              },
+              "environment_variables": {
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "integer",
+                    "boolean"
+                  ]
+                },
+                "description": "Build environment variables for the function, defined as key-value pairs",
+                "errorMessage": "'environment_variables' must be an object with key-value pairs of strings, integers, or booleans if provided or must be omitted",
+                "type": "object"
+              },
+              "ingress_settings": {
+                "default": "ALLOW_ALL",
+                "description": "Ingress settings to control traffic access to the function",
+                "enum": [
+                  "ALLOW_ALL",
+                  "ALLOW_INTERNAL_ONLY",
+                  "ALLOW_INTERNAL_AND_GCLB"
+                ],
+                "errorMessage": "'ingress_settings' must be one of 'ALLOW_ALL', 'ALLOW_INTERNAL_ONLY' or 'ALLOW_INTERNAL_AND_GCLB' if provided or must be omitted",
+                "type": "string"
+              },
+              "max_instance_count": {
+                "description": "Maximum number of instances allowed for the function",
+                "errorMessage": "'max_instance_count' must be an integer if provided or must be omitted",
+                "type": "integer"
+              },
+              "max_instance_request_concurrency": {
+                "default": 1,
+                "description": "Maximum number of concurrent requests allowed per instance",
+                "errorMessage": "'max_instance_request_concurrency' and must be an integer",
+                "type": "integer"
+              },
+              "min_instance_count": {
+                "description": "Minimum number of instances to keep warm for the function",
+                "errorMessage": "'min_instance_count' must be an integer if provided or must be omitted",
+                "type": "integer"
+              },
+              "secret_environment_variables": {
+                "description": "Secret environment variables for the function, defined as an array of secrets",
+                "errorMessage": "'secret_environment_variables' must be a non-empty array of objects if provided or must be omitted",
+                "items": {
+                  "errorMessage": "Each object in 'secret_environment_variables' must include 'key', 'secret', and 'version'",
+                  "properties": {
+                    "key": {
+                      "description": "Name of the environment variable that holds the secret",
+                      "errorMessage": "'key' 'secret_environment_variables' is required and must be a string",
+                      "type": "string"
+                    },
+                    "secret": {
+                      "description": "Name of the secret resource to retrieve",
+                      "errorMessage": "'secret' 'secret_environment_variables' is required and must be a string",
+                      "type": "string"
+                    },
+                    "version": {
+                      "description": "Version of the secret to use, e.g., 'latest' or a numeric version string",
+                      "errorMessage": "'version' is required and must be either 'latest' or a numeric string ",
+                      "pattern": "^(latest|[0-9]+)$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "secret",
+                    "version"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "timeout_seconds": {
+                "default": 60,
+                "description": "Execution timeout for the function in seconds",
+                "errorMessage": "'timeout_seconds' must be an integer if provided or must be omitted",
+                "type": "integer"
+              },
+              "vpc_connector": {
+                "description": "VPC connector to use, if applicable",
+                "errorMessage": "'vpc_connector' must be a string if provided or must be omitted",
+                "type": "string"
+              },
+              "vpc_connector_egress_settings": {
+                "description": "Egress settings for the VPC connector",
+                "enum": [
+                  "VPC_CONNECTOR_EGRESS_SETTINGS_UNSPECIFIED",
+                  "PRIVATE_RANGES_ONLY",
+                  "ALL_TRAFFIC"
+                ],
+                "errorMessage": "'vpc_connector_egress_settings' must be one of 'VPC_CONNECTOR_EGRESS_SETTINGS_UNSPECIFIED', 'PRIVATE_RANGES_ONLY' or 'ALL_TRAFFIC' if provided or must be omitted",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "source_folder": {
+            "description": "Relative path to the folder containing function code",
+            "errorMessage": "'source_folder' is a required property and must be a string specifying the function's source folder",
+            "type": "string"
+          },
+          "version": {
+            "description": "Version of the function configuration. Must be 2 for this schema",
+            "enum": [
+              2
+            ],
+            "errorMessage": "'version' is a required property and must be set to 1 or 2",
+            "type": "integer"
           }
         },
-        "required": ["name", "version", "source_folder", "build_config"],
+        "required": [
+          "name",
+          "version",
+          "source_folder",
+          "build_config"
+        ],
+        "type": "object",
         "unevaluatedProperties": false
       },
       "minItems": 1,
-      "errorMessage": "'functions' property must be a non-empty array of function objects"
+      "type": "array"
     }
   },
-  "required": ["functions"],
+  "required": [
+    "functions"
+  ],
+  "type": "object",
   "unevaluatedProperties": false
 }

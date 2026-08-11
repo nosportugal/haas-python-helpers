@@ -1,0 +1,26 @@
+"""yaks-observability — Production-grade OpenTelemetry for FastAPI.
+
+Usage::
+
+    from fastapi import FastAPI
+    from yaks_observability import setup
+
+    app = FastAPI()
+    setup(app)
+"""
+
+from __future__ import annotations
+
+from .config import Environment, ObservabilityConfig
+from .resilience import get_batch_processor_kwargs
+from .setup import setup
+
+__version__ = "1.0.0"
+
+__all__ = [
+    "Environment",
+    "ObservabilityConfig",
+    "get_batch_processor_kwargs",
+    "setup",
+    "__version__",
+]

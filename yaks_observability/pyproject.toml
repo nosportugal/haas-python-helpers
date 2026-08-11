@@ -85,7 +85,7 @@ select = ["F", "E", "W", "PL", "PT"]
 ignore = ["E203", "PLC2701"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["PLR2004", "PLR6301", "PLR0913", "PLC0415"]
+"tests/**" = ["PLR2004", "PLR6301", "PLR0913", "PLC0415", "PLR0904"]
 "src/yaks_observability/instrumentation.py" = ["PLR0402", "PLC0415"]
 
 [tool.ruff.format]

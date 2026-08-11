@@ -63,3 +63,26 @@ def _make_record(path: str) -> logging.LogRecord:
         args=("127.0.0.1", "GET", path, "1.1", 200),
         exc_info=None,
     )
+
+
+class TestResourceAttributes:
+    @patch.dict(
+        os.environ,
+        {
+            "SERVICE_MANAGEMENT_ENVIRONMENT": "prod",
+            "OTEL_SERVICE_NAME": "svc-a",
+            "OTEL_SERVICE_VERSION": "9.9.9",
+            "OTEL_SERVICE_INSTANCE_ID": "pod-1",
+        },
+        clear=True,
+    )
+    def test_build_resource_includes_service_identity(self) -> None:
+        from yaks_observability.config import ObservabilityConfig
+        from yaks_observability.instrumentation import _build_resource
+
+        config = ObservabilityConfig.from_env()
+        resource = _build_resource(config)
+        assert resource.attributes["service.name"] == "svc-a"
+        assert resource.attributes["service.version"] == "9.9.9"
+        assert resource.attributes["service.instance.id"] == "pod-1"
+        assert resource.attributes["deployment.environment"] == "prod"

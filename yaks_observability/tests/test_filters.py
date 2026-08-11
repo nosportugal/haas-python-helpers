@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from yaks_observability.filters import HealthCheckFilter, HealthCheckUrlFilter
+from yaks_observability.filters import HealthCheckFilter
 
 
 class TestHealthCheckFilter:
@@ -71,58 +71,6 @@ class TestHealthCheckFilter:
             args=("127.0.0.1", "GET", "/ping", "1.1", 200),
             exc_info=None,
         )
-        assert f.filter(record) is False
-
-
-class TestHealthCheckUrlFilter:
-    def test_attr_match(self) -> None:
-        f = HealthCheckUrlFilter()
-        record = logging.LogRecord(
-            name="app",
-            level=logging.INFO,
-            pathname="",
-            lineno=1,
-            msg="request",
-            args=(),
-            exc_info=None,
-        )
-        record.http_target = "/health"
-        assert f.filter(record) is False
-
-    def test_attr_no_match(self) -> None:
-        f = HealthCheckUrlFilter()
-        record = logging.LogRecord(
-            name="app",
-            level=logging.INFO,
-            pathname="",
-            lineno=1,
-            msg="request",
-            args=(),
-            exc_info=None,
-        )
-        record.http_target = "/api/data"
-        assert f.filter(record) is True
-
-    def test_missing_attr(self) -> None:
-        f = HealthCheckUrlFilter()
-        record = logging.LogRecord(
-            name="app",
-            level=logging.INFO,
-            pathname="",
-            lineno=1,
-            msg="request",
-            args=(),
-            exc_info=None,
-        )
-        assert f.filter(record) is True
-
-    def test_query_string_stripped(self) -> None:
-        f = HealthCheckUrlFilter()
-        record = logging.LogRecord(
-            name="app", level=logging.INFO, pathname="", lineno=1,
-            msg="request", args=(), exc_info=None,
-        )
-        record.http_target = "/health?foo=bar"
         assert f.filter(record) is False
 
     def test_trailing_slash_match(self) -> None:

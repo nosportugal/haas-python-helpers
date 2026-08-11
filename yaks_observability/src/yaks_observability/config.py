@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import socket
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -71,12 +72,14 @@ class ObservabilityConfig:
     enable_pii_redaction: bool
     testing_mode: bool
     service_namespace: str = ""
+    service_version: str = ""
+    service_instance_id: str = ""
+    pii_safe_keys: tuple[str, ...] = ()
+    pii_body_patterns: tuple[str, ...] = ()
     extra_resource_attributes: dict[str, str] = field(default_factory=dict)
 
-    # ruff: ignore PLR0914 (too-many-locals) — env parsing inherently has many variables
-    # noqa: PLR0914
     @classmethod
-    def from_env(cls) -> ObservabilityConfig:
+    def from_env(cls) -> ObservabilityConfig:  # noqa: PLR0914
         """Build configuration from environment variables with sensible defaults."""
         env_raw = os.getenv("SERVICE_MANAGEMENT_ENVIRONMENT", "dev").lower()
         try:
@@ -101,11 +104,21 @@ class ObservabilityConfig:
         extra_resource_attributes = _parse_resource_attrs(raw_attrs)
 
         service_namespace = os.getenv("OTEL_SERVICE_NAMESPACE", "")
+        service_version = os.getenv("OTEL_SERVICE_VERSION", "")
+        service_instance_id = os.getenv("OTEL_SERVICE_INSTANCE_ID", "") or (
+            socket.gethostname()
+        )
+        pii_safe_keys = _parse_comma_list(os.getenv("OTEL_PII_SAFE_KEYS", ""))
+        pii_body_patterns = _parse_comma_list(
+            os.getenv("OTEL_PII_BODY_PATTERNS", "")
+        )
 
         return cls(
             environment=environment,
             service_name=service_name,
             service_namespace=service_namespace,
+            service_version=service_version,
+            service_instance_id=service_instance_id,
             otlp_endpoint=otlp_endpoint,
             log_level=log_level,
             sampler=sampler,
@@ -116,6 +129,8 @@ class ObservabilityConfig:
             enable_otlp_traces=toggle["enable_otlp_traces"],
             enable_otlp_metrics=toggle["enable_otlp_metrics"],
             enable_pii_redaction=toggle["enable_pii_redaction"],
+            pii_safe_keys=pii_safe_keys,
+            pii_body_patterns=pii_body_patterns,
             testing_mode=testing_mode,
             extra_resource_attributes=extra_resource_attributes,
         )
@@ -150,6 +165,10 @@ def _parse_feature_toggles(testing_mode: bool) -> dict[str, bool]:
         ),
         "enable_pii_redaction": _bool_env("OTEL_ENABLE_PII_REDACTION", True),
     }
+
+
+def _parse_comma_list(raw: str) -> tuple[str, ...]:
+    return tuple(part.strip() for part in raw.split(",") if part.strip())
 
 
 def _parse_resource_attrs(raw: str) -> dict[str, str]:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import TYPE_CHECKING
 
 from opentelemetry import metrics, trace
@@ -49,8 +50,24 @@ def _build_resource(config: ObservabilityConfig) -> Resource:
     namespace = config.service_namespace or os.getenv("OTEL_SERVICE_NAMESPACE", "")
     if namespace:
         attrs[ResourceAttributes.SERVICE_NAMESPACE] = namespace
+    if config.service_version:
+        attrs[ResourceAttributes.SERVICE_VERSION] = config.service_version
+    if config.service_instance_id:
+        attrs[ResourceAttributes.SERVICE_INSTANCE_ID] = config.service_instance_id
     attrs.update(config.extra_resource_attributes)
     return Resource.create(attrs)
+
+
+def _compile_body_patterns(
+    raw_patterns: tuple[str, ...],
+) -> tuple[re.Pattern[str], ...]:
+    compiled: list[re.Pattern[str]] = []
+    for p in raw_patterns:
+        try:
+            compiled.append(re.compile(p))
+        except re.error as exc:
+            logger.warning("Invalid PII body pattern %r: %s", p, exc)
+    return tuple(compiled)
 
 
 def _resolve_sampler(config: ObservabilityConfig):
@@ -95,7 +112,15 @@ def _build_tracer_provider(
     provider = TracerProvider(resource=resource, sampler=sampler)
     exporter = _create_trace_exporter(config)
     if config.enable_pii_redaction:
-        exporter = RedactingSpanExporter(exporter, PIIRedactionProcessor())
+        exporter = RedactingSpanExporter(
+            exporter,
+            PIIRedactionProcessor(
+                extra_safe_keys=set(config.pii_safe_keys),
+                extra_body_patterns=_compile_body_patterns(
+                    config.pii_body_patterns
+                ),
+            ),
+        )
     processor = _create_span_processor(exporter)
     provider.add_span_processor(processor)
     return provider
@@ -158,7 +183,15 @@ def _create_log_provider(
         exporter_kwargs["endpoint"] = config.otlp_endpoint
     exporter = OTLPLogExporter(**exporter_kwargs)
     if config.enable_pii_redaction:
-        exporter = RedactingLogExporter(exporter, PIIRedactionProcessor())
+        exporter = RedactingLogExporter(
+            exporter,
+            PIIRedactionProcessor(
+                extra_safe_keys=set(config.pii_safe_keys),
+                extra_body_patterns=_compile_body_patterns(
+                    config.pii_body_patterns
+                ),
+            ),
+        )
     processor = BatchLogRecordProcessor(
         exporter,
         **get_batch_processor_kwargs(),
@@ -173,7 +206,9 @@ def _create_log_provider(
     if any(getattr(h, "_yaks_otlp_handler", False) for h in root.handlers):
         return provider
 
-    handler = LoggingHandler(level=logging.DEBUG, logger_provider=provider)
+    handler = LoggingHandler(
+        level=config.log_level, logger_provider=provider
+    )
     handler._yaks_otlp_handler = True  # type: ignore[attr-defined]
     root.addHandler(handler)
 

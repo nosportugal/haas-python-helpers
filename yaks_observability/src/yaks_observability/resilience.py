@@ -39,18 +39,26 @@ def get_batch_processor_kwargs(
     }
 
 
-def get_exporter_kwargs(timeout: int | None = None) -> dict[str, int]:
-    """Return safe timeout for OTLP exporters.
+def get_exporter_kwargs(timeout: int | None = None) -> dict[str, float]:
+    """Return safe timeout for OTLP/HTTP exporters.
 
     If the collector is unreachable or slow, the export call times out
     quickly so the application thread is never blocked for long.
+
+    Note: the OTLP/HTTP exporters (``OTLPSpanExporter``, ``OTLPLogExporter``,
+    ``OTLPMetricExporter``) expect ``timeout`` in **seconds**, whereas the
+    batch processors use milliseconds. This function takes the override in
+    milliseconds (to stay consistent with the batch-processor API) and
+    converts to seconds for the exporter.
 
     Args:
         timeout: Override default export timeout in milliseconds.
 
     Returns:
-        Dict of keyword arguments accepted by OTLP exporters.
+        Dict of keyword arguments accepted by OTLP exporters (``timeout``
+        in seconds).
     """
+    timeout_ms = timeout or DEFAULT_EXPORT_TIMEOUT_MS
     return {
-        "timeout": timeout or DEFAULT_EXPORT_TIMEOUT_MS,
+        "timeout": max(1.0, timeout_ms / 1000),
     }

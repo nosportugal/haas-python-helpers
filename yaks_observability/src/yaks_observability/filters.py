@@ -10,11 +10,11 @@ _UVICORN_PATH_INDEX = 2
 
 
 def _match_health_path(raw_path: str, endpoints: tuple[str, ...]) -> bool:
-    """Strip query strings and trailing slashes, then match path prefix.
+    """Strip query strings and trailing slashes, then match exact path.
 
     Args:
         raw_path: The raw request path (may include query string).
-        endpoints: Tuple of known health endpoint prefixes.
+        endpoints: Tuple of known health endpoint paths.
 
     Returns:
         True if the path matches a known health endpoint.
@@ -26,10 +26,11 @@ def _match_health_path(raw_path: str, endpoints: tuple[str, ...]) -> bool:
 
 
 class HealthCheckFilter(logging.Filter):
-    """Suppress access-log records for health probes.
+    """Suppress access-log records for known health endpoints.
 
-    Designed for uvicorn.access logger where the request path lives in
-    ``record.args`` (index 2) when the message format includes it.
+    Matches the request path exactly (after stripping query-strings and
+    trailing slashes).  Designed for uvicorn.access logger where the
+    request path lives in ``record.args`` (index 2).
     """
 
     def __init__(self, endpoints: tuple[str, ...] | None = None) -> None:
@@ -53,35 +54,6 @@ class HealthCheckFilter(logging.Filter):
         min_args_needed = _UVICORN_PATH_INDEX + 1
         if len(args) >= min_args_needed and isinstance(args[_UVICORN_PATH_INDEX], str):
             path: str = args[_UVICORN_PATH_INDEX]
-            if _match_health_path(path, self.endpoints):
-                return False
-        return True
-
-
-class HealthCheckUrlFilter(logging.Filter):
-    """Generic filter using a record attribute injected by OTEL ASGI middleware.
-
-    Falls back gracefully if the attribute is absent.
-    """
-
-    def __init__(
-        self,
-        endpoints: tuple[str, ...] | None = None,
-        attr_name: str = "http_target",
-    ) -> None:
-        super().__init__()
-        self.endpoints = endpoints or (
-            "/health",
-            "/readiness",
-            "/liveness",
-            "/metrics",
-            "/healthz",
-        )
-        self.attr_name = attr_name
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        path = getattr(record, self.attr_name, None)
-        if isinstance(path, str):
             if _match_health_path(path, self.endpoints):
                 return False
         return True

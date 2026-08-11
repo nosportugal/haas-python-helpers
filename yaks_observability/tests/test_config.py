@@ -79,3 +79,31 @@ class TestObservabilityConfig:
         config = ObservabilityConfig.from_env()
         # Default env=dev, but logs explicitly disabled
         assert config.enable_otlp_logs is False
+
+
+class TestServiceIdentityAttributes:
+    @patch.dict(
+        os.environ,
+        {
+            "SERVICE_MANAGEMENT_ENVIRONMENT": "prod",
+            "OTEL_SERVICE_VERSION": "2.4.1",
+            "OTEL_SERVICE_INSTANCE_ID": "pod-xyz",
+        },
+        clear=True,
+    )
+    def test_service_version_and_instance_from_env(self) -> None:
+        config = ObservabilityConfig.from_env()
+        assert config.service_version == "2.4.1"
+        assert config.service_instance_id == "pod-xyz"
+
+    @patch.dict(
+        os.environ,
+        {"SERVICE_MANAGEMENT_ENVIRONMENT": "prod"},
+        clear=True,
+    )
+    def test_service_instance_id_defaults_to_hostname(self) -> None:
+        import socket
+
+        config = ObservabilityConfig.from_env()
+        assert config.service_instance_id == socket.gethostname()
+        assert not config.service_version

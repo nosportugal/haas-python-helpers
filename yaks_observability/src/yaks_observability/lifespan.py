@@ -80,14 +80,14 @@ def attach_lifespan(app: FastAPI) -> None:
     ) -> AsyncIterator[None]:
         async with contextlib.AsyncExitStack() as stack:
             await stack.enter_async_context(existing(app_inner))
-            yield
-            # shutdown runs after yield via finally in _managed_lifespan
-            # but we don't re-enter it; instead call shutdown directly:
-            if _GLOBAL_STATE is not None:
-                shutdown_providers(
-                    _GLOBAL_STATE.trace_provider,
-                    _GLOBAL_STATE.log_provider,
-                    _GLOBAL_STATE.metric_provider,
-                )
+            try:
+                yield
+            finally:
+                if _GLOBAL_STATE is not None:
+                    shutdown_providers(
+                        _GLOBAL_STATE.trace_provider,
+                        _GLOBAL_STATE.log_provider,
+                        _GLOBAL_STATE.metric_provider,
+                    )
 
     app.router.lifespan_context = _chained_lifespan

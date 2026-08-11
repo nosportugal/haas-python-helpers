@@ -29,9 +29,12 @@ class TestResilienceDefaults:
         assert kwargs["schedule_delay_millis"] == 1000
 
     def test_exporter_kwargs(self) -> None:
+        # OTLP/HTTP exporters expect timeout in SECONDS; the 10_000 ms
+        # default must be converted to 10 s (not passed through as 10_000 s).
         kwargs = get_exporter_kwargs()
-        assert kwargs["timeout"] == 10000
+        assert kwargs["timeout"] == 10
 
     def test_exporter_kwargs_override(self) -> None:
+        # Override is milliseconds → converted to seconds.
         kwargs = get_exporter_kwargs(timeout=5000)
-        assert kwargs["timeout"] == 5000
+        assert kwargs["timeout"] == 5

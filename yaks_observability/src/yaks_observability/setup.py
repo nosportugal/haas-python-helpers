@@ -1,5 +1,3 @@
-"""Main entry point: one-call observability setup for FastAPI apps."""
-
 from __future__ import annotations
 
 import logging
@@ -24,6 +22,9 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
+
+# Module-level flag for idempotency (replaced monkeypatching on stdlib logging)
+_setup_called: bool = False
 
 
 def setup(  # noqa: PLR0913
@@ -57,6 +58,8 @@ def setup(  # noqa: PLR0913
     Returns:
         The resolved :class:`ObservabilityConfig`.
     """
+    global _setup_called  # noqa: PLW0603
+
     resolved = config or ObservabilityConfig.from_env()
 
     # 1. Logging basics (console + health filter)
@@ -80,15 +83,14 @@ def setup(  # noqa: PLR0913
             LoggingInstrumentor,
         )
 
-        if not getattr(logging, "_yaks_logging_instrumented", False):
+        if not _setup_called:
             LoggingInstrumentor().instrument(inject_trace_context=True)
-            logging._yaks_logging_instrumented = True  # type: ignore[attr-defined]
 
         log_provider = _init_logging(resolved, resource)
         metric_provider = _init_metrics(resolved, resource)
 
-    # 3. Register lifespan shutdown
-    set_lifespan_state(trace_provider, log_provider, metric_provider)
+    # 3. Register lifespan shutdown (idempotent; repeat calls update state)
+    set_lifespan_state(trace_provider, log_provider, metric_provider, app_id=id(app))
     attach_lifespan(app)
 
     # 4. Instrument FastAPI (ASGI middleware)
@@ -104,9 +106,10 @@ def setup(  # noqa: PLR0913
     if enable_sqlalchemy and engine is not None:
         instrument_sqlalchemy(engine)
 
+    _setup_called = True
+
     logger.info(
-        "Observability setup complete: "
-        "env=%s service=%s trace=%s logs=%s metrics=%s",
+        "Observability setup complete: env=%s service=%s trace=%s logs=%s metrics=%s",
         resolved.environment.value,
         resolved.service_name,
         trace_provider is not None,

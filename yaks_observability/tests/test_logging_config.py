@@ -28,9 +28,7 @@ class TestConfigureLogging:
         configure_logging(config)
         root = logging.getLogger()
         assert root.level == logging.DEBUG
-        assert any(
-            isinstance(h, logging.StreamHandler) for h in root.handlers
-        )
+        assert any(isinstance(h, logging.StreamHandler) for h in root.handlers)
 
     def test_prod_json_format(self) -> None:
         config = ObservabilityConfig(
@@ -72,6 +70,5 @@ class TestConfigureLogging:
         configure_logging(config)
         uvicorn_access = logging.getLogger("uvicorn.access")
         assert any(
-            f.__class__.__name__ == "HealthCheckFilter"
-            for f in uvicorn_access.filters
+            f.__class__.__name__ == "HealthCheckFilter" for f in uvicorn_access.filters
         )

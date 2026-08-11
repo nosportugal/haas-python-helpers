@@ -7,6 +7,10 @@ from urllib.parse import urlsplit
 
 # Minimum index for the path argument in uvicorn.access log record.args
 _UVICORN_PATH_INDEX = 2
+# Status code is the last element in uvicorn.access log record.args
+_UVICORN_STATUS_INDEX = 4
+# HTTP status code threshold for treating a response as an error
+_HTTP_ERROR_THRESHOLD = 400
 
 
 def _match_health_path(raw_path: str, endpoints: tuple[str, ...]) -> bool:
@@ -44,16 +48,35 @@ class HealthCheckFilter(logging.Filter):
         )
 
     def filter(self, record: logging.LogRecord) -> bool:
-        """Return ``False`` to drop the record; ``True`` to keep it."""
-        # Pattern: uvicorn.access log records have args like:
-        #   (client_addr, method, path, http_version, status_code)
+        """Return ``False`` to drop the record; ``True`` to keep it.
+
+        Successful health checks (2xx/3xx) are suppressed.
+        Failed health checks (4xx/5xx) are kept for diagnostics.
+        """
         if not hasattr(record, "args") or not record.args:
             return True
 
         args = record.args
-        min_args_needed = _UVICORN_PATH_INDEX + 1
-        if len(args) >= min_args_needed and isinstance(args[_UVICORN_PATH_INDEX], str):
-            path: str = args[_UVICORN_PATH_INDEX]
-            if _match_health_path(path, self.endpoints):
-                return False
-        return True
+        path = None
+        status = None
+
+        if len(args) >= _UVICORN_PATH_INDEX + 1 and isinstance(
+            args[_UVICORN_PATH_INDEX], str
+        ):
+            path = args[_UVICORN_PATH_INDEX]
+        if len(args) >= _UVICORN_STATUS_INDEX + 1 and isinstance(
+            args[_UVICORN_STATUS_INDEX], int
+        ):
+            status = args[_UVICORN_STATUS_INDEX]
+
+        if path is None:
+            return True
+
+        if not _match_health_path(path, self.endpoints):
+            return True
+
+        # Keep failed health checks for diagnostics
+        if status is not None and status >= _HTTP_ERROR_THRESHOLD:
+            return True
+
+        return False

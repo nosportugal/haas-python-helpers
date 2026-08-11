@@ -29,23 +29,31 @@ class _LifespanState:
         self.metric_provider: MeterProvider | None = None
 
 
-_GLOBAL_STATE: _LifespanState | None = None
+# Per-app state: FastAPI instance id → _LifespanState
+_APP_STATE: dict[int, _LifespanState] = {}
 
 
 def set_lifespan_state(
     trace_provider=None,
     log_provider=None,
     metric_provider=None,
+    app_id: int | None = None,
 ) -> None:
-    global _GLOBAL_STATE  # noqa: PLW0603
-    if _GLOBAL_STATE is None:
-        _GLOBAL_STATE = _LifespanState()
+    state = _LifespanState()
     if trace_provider is not None:
-        _GLOBAL_STATE.trace_provider = trace_provider
+        state.trace_provider = trace_provider
     if log_provider is not None:
-        _GLOBAL_STATE.log_provider = log_provider
+        state.log_provider = log_provider
     if metric_provider is not None:
-        _GLOBAL_STATE.metric_provider = metric_provider
+        state.metric_provider = metric_provider
+    target_id = app_id or id(state)
+    _APP_STATE[target_id] = state
+
+
+def teardown_lifespan_state(app_id: int | None = None) -> None:
+    """Remove stored state for an app (useful in tests)."""
+    if app_id is not None and app_id in _APP_STATE:
+        del _APP_STATE[app_id]
 
 
 @contextlib.asynccontextmanager
@@ -54,24 +62,31 @@ async def _managed_lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        if _GLOBAL_STATE is not None:
+        state = _APP_STATE.get(id(app))
+        if state is not None:
             shutdown_providers(
-                _GLOBAL_STATE.trace_provider,
-                _GLOBAL_STATE.log_provider,
-                _GLOBAL_STATE.metric_provider,
+                state.trace_provider,
+                state.log_provider,
+                state.metric_provider,
             )
+            _APP_STATE.pop(id(app), None)
 
 
 def attach_lifespan(app: FastAPI) -> None:
     """Replace or wrap the app's lifespan with OTEL shutdown logic.
 
     If the app already has a lifespan, we chain them: existing first,
-    then shutdown.
+    then shutdown.  Guard against duplicate chaining.
     """
     existing = app.router.lifespan_context
 
+    # Already wrapped by us — do not double-wrap
+    if getattr(app.router, "_yaks_lifespan_wrapped", False):
+        return
+
     if existing is None:
         app.router.lifespan_context = _managed_lifespan
+        app.router._yaks_lifespan_wrapped = True  # type: ignore[attr-defined]
         return
 
     @contextlib.asynccontextmanager
@@ -83,11 +98,14 @@ def attach_lifespan(app: FastAPI) -> None:
             try:
                 yield
             finally:
-                if _GLOBAL_STATE is not None:
+                state = _APP_STATE.get(id(app_inner))
+                if state is not None:
                     shutdown_providers(
-                        _GLOBAL_STATE.trace_provider,
-                        _GLOBAL_STATE.log_provider,
-                        _GLOBAL_STATE.metric_provider,
+                        state.trace_provider,
+                        state.log_provider,
+                        state.metric_provider,
                     )
+                    _APP_STATE.pop(id(app_inner), None)
 
     app.router.lifespan_context = _chained_lifespan
+    app.router._yaks_lifespan_wrapped = True  # type: ignore[attr-defined]

@@ -20,7 +20,7 @@ from tests._otel_helpers import InMemorySpanExporter
 class TestTracingInMemory:
     @patch.dict(
         os.environ,
-        {"SERVICE_MANAGEMENT_ENVIRONMENT": "testing"},
+        {"ENVIRONMENT_TYPE": "testing"},
         clear=True,
     )
     def test_setup_creates_trace_provider(self) -> None:
@@ -69,7 +69,7 @@ class TestResourceAttributes:
     @patch.dict(
         os.environ,
         {
-            "SERVICE_MANAGEMENT_ENVIRONMENT": "prod",
+            "ENVIRONMENT_TYPE": "prod",
             "OTEL_SERVICE_NAME": "svc-a",
             "OTEL_SERVICE_VERSION": "9.9.9",
             "OTEL_SERVICE_INSTANCE_ID": "pod-1",

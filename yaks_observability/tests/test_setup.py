@@ -30,7 +30,7 @@ class _FakeExporter:
 class TestSetup:
     @patch.dict(
         os.environ,
-        {"SERVICE_MANAGEMENT_ENVIRONMENT": "testing"},
+        {"ENVIRONMENT_TYPE": "testing"},
         clear=True,
     )
     def test_setup_testing_mode(self) -> None:
@@ -42,7 +42,7 @@ class TestSetup:
     @patch.dict(
         os.environ,
         {
-            "SERVICE_MANAGEMENT_ENVIRONMENT": "dev",
+            "ENVIRONMENT_TYPE": "dev",
             "OTEL_SERVICE_NAME": "test-svc",
         },
         clear=True,
@@ -68,7 +68,7 @@ class TestSetup:
 
     @patch.dict(
         os.environ,
-        {"SERVICE_MANAGEMENT_ENVIRONMENT": "testing"},
+        {"ENVIRONMENT_TYPE": "testing"},
         clear=True,
     )
     def test_setup_with_custom_config(self) -> None:
@@ -94,7 +94,7 @@ class TestSetup:
 
     @patch.dict(
         os.environ,
-        {"SERVICE_MANAGEMENT_ENVIRONMENT": "testing"},
+        {"ENVIRONMENT_TYPE": "testing"},
         clear=True,
     )
     def test_setup_lifespan_attached(self) -> None:

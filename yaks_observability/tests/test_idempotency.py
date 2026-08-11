@@ -37,9 +37,7 @@ class TestConfigureLoggingIdempotency:
         configure_logging(base_config)
         configure_logging(base_config)
 
-        yaks_handlers = [
-            h for h in root.handlers if getattr(h, "_yaks_handler", False)
-        ]
+        yaks_handlers = [h for h in root.handlers if getattr(h, "_yaks_handler", False)]
         assert len(yaks_handlers) == 1
 
         for h in root.handlers[:]:

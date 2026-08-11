@@ -28,6 +28,7 @@ from opentelemetry.semconv.resource import ResourceAttributes
 
 from .config import ObservabilityConfig
 from .graceful_degradation import suppress_otel_errors
+from .logging_config import _OtelInternalFilter
 from .pii_redaction import (
     PIIRedactionProcessor,
     RedactingLogExporter,
@@ -116,9 +117,7 @@ def _build_tracer_provider(
             exporter,
             PIIRedactionProcessor(
                 extra_safe_keys=set(config.pii_safe_keys),
-                extra_body_patterns=_compile_body_patterns(
-                    config.pii_body_patterns
-                ),
+                extra_body_patterns=_compile_body_patterns(config.pii_body_patterns),
             ),
         )
     processor = _create_span_processor(exporter)
@@ -187,9 +186,7 @@ def _create_log_provider(
             exporter,
             PIIRedactionProcessor(
                 extra_safe_keys=set(config.pii_safe_keys),
-                extra_body_patterns=_compile_body_patterns(
-                    config.pii_body_patterns
-                ),
+                extra_body_patterns=_compile_body_patterns(config.pii_body_patterns),
             ),
         )
     processor = BatchLogRecordProcessor(
@@ -206,10 +203,12 @@ def _create_log_provider(
     if any(getattr(h, "_yaks_otlp_handler", False) for h in root.handlers):
         return provider
 
-    handler = LoggingHandler(
-        level=config.log_level, logger_provider=provider
-    )
+    handler = LoggingHandler(level=config.log_level, logger_provider=provider)
     handler._yaks_otlp_handler = True  # type: ignore[attr-defined]
+    # Block OTEL internal logs from re-entering the export pipeline.
+    # This is the second layer of defense (the first is propagate=False
+    # on the "opentelemetry" logger in configure_logging).
+    handler.addFilter(_OtelInternalFilter())
     root.addHandler(handler)
 
     return provider

@@ -5,26 +5,33 @@ on:
     branches: [main]
     paths:
       - "yaks_observability/**"
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/ci-yaks-observability.yml"
   pull_request:
     branches: [main]
     paths:
       - "yaks_observability/**"
-      - ".github/workflows/ci.yml"
+      - ".github/workflows/ci-yaks-observability.yml"
+
+permissions:
+  contents: read
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     defaults:
       run:
         working-directory: yaks_observability
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install Poetry
         uses: snok/install-poetry@v1

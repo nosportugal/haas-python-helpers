@@ -81,25 +81,23 @@ _SENSITIVE_KEY_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
 
 # Built-in keys that are safe by default (prevents over-redaction of
 # common non-secret observability fields).
-_BUILT_IN_SAFE_KEYS: frozenset[str] = frozenset(
-    {
-        "prompt_tokens",
-        "completion_tokens",
-        "token_count",
-        "session_duration",
-        "session_start",
-        "session_id",
-        "email_verified",
-        "token_type",
-        "service_name",
-        "server.address",
-        "client.address",
-        "network.peer.address",
-        "network.local.address",
-        "source.address",
-        "destination.address",
-    }
-)
+_BUILT_IN_SAFE_KEYS: frozenset[str] = frozenset({
+    "prompt_tokens",
+    "completion_tokens",
+    "token_count",
+    "session_duration",
+    "session_start",
+    "session_id",
+    "email_verified",
+    "token_type",
+    "service_name",
+    "server.address",
+    "client.address",
+    "network.peer.address",
+    "network.local.address",
+    "source.address",
+    "destination.address",
+})
 
 # ---------------------------------------------------------------------------
 # 2. Body text scrubbing – value-shape patterns + key-value patterns
@@ -109,17 +107,13 @@ _BUILT_IN_SAFE_KEYS: frozenset[str] = frozenset(
 # These catch bare secrets in free text (e-mails, PANs, IBANs, JWTs).
 _BODY_SHAPE_PATTERNS: tuple[re.Pattern[str], ...] = (
     # E-mail addresses
-    re.compile(
-        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE
-    ),
+    re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE),
     # Credit-card-like numbers (16 digits, grouped or ungrouped)
     re.compile(r"\b(?:\d{4}[-\s]?){3}\d{4}\b"),
     # IBAN (simplified: 2 letters + 2 digits + 13-30 alphanum)
     re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,28}\b"),
     # JWTs  (eyJ… base64url segments)
-    re.compile(
-        r"\beyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\b"
-    ),
+    re.compile(r"\beyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\b"),
     # Bearer tokens after colon/space (JWT or opaque)
     re.compile(
         r"\b([Bb]earer)\s*[:=]\s+([^,;\s]+)",
@@ -198,15 +192,9 @@ class PIIRedactionProcessor:
         )
         # Store JSON / plain KVP patterns separately so each gets the right
         # replacement string (preserving its own quote style).
-        self._json_dq_patterns: tuple[re.Pattern[str], ...] = (
-            _JSON_BODY_KVP_PATTERNS
-        )
-        self._json_sq_patterns: tuple[re.Pattern[str], ...] = (
-            _JSON_SQ_BODY_KVP_PATTERNS
-        )
-        self._plain_kvp_patterns: tuple[re.Pattern[str], ...] = (
-            _PLAIN_BODY_KVP_PATTERNS
-        )
+        self._json_dq_patterns: tuple[re.Pattern[str], ...] = _JSON_BODY_KVP_PATTERNS
+        self._json_sq_patterns: tuple[re.Pattern[str], ...] = _JSON_SQ_BODY_KVP_PATTERNS
+        self._plain_kvp_patterns: tuple[re.Pattern[str], ...] = _PLAIN_BODY_KVP_PATTERNS
 
     def is_safe(self, key: str) -> bool:
         if key in _BUILT_IN_SAFE_KEYS:
@@ -361,23 +349,15 @@ class RedactingSpanExporter(SpanExporter):
     def _scrub_events(self, span: ReadableSpan) -> tuple:
         result = []
         for ev in span.events or ():
-            redacted_attrs = self._redaction.scrub_dict(
-                dict(ev.attributes or {})
-            )
-            result.append(
-                _RedactedEventProxy(ev, attributes=redacted_attrs)
-            )
+            redacted_attrs = self._redaction.scrub_dict(dict(ev.attributes or {}))
+            result.append(_RedactedEventProxy(ev, attributes=redacted_attrs))
         return tuple(result)
 
     def _scrub_links(self, span: ReadableSpan) -> tuple:
         result = []
         for link in span.links or ():
-            redacted_attrs = self._redaction.scrub_dict(
-                dict(link.attributes or {})
-            )
-            result.append(
-                _RedactedLinkProxy(link, attributes=redacted_attrs)
-            )
+            redacted_attrs = self._redaction.scrub_dict(dict(link.attributes or {}))
+            result.append(_RedactedLinkProxy(link, attributes=redacted_attrs))
         return tuple(result)
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
@@ -385,9 +365,7 @@ class RedactingSpanExporter(SpanExporter):
         for span in spans:
             redacted = _RedactedAttributesProxy(
                 span,
-                attributes=self._redaction.scrub_dict(
-                    dict(span.attributes or {})
-                ),
+                attributes=self._redaction.scrub_dict(dict(span.attributes or {})),
                 events=self._scrub_events(span),
                 links=self._scrub_links(span),
             )
@@ -412,15 +390,11 @@ class RedactingLogExporter(LogRecordExporter):
         self._exporter = exporter
         self._redaction = redaction or PIIRedactionProcessor()
 
-    def export(
-        self, batch: Sequence[ReadableLogRecord]
-    ) -> LogRecordExportResult:
+    def export(self, batch: Sequence[ReadableLogRecord]) -> LogRecordExportResult:
         redacted_batch = [self._redact_record(record) for record in batch]
         return self._exporter.export(redacted_batch)
 
-    def _redact_record(
-        self, record: ReadableLogRecord
-    ) -> ReadableLogRecord:
+    def _redact_record(self, record: ReadableLogRecord) -> ReadableLogRecord:
         log_record = record.log_record
         attrs = dict(log_record.attributes or {})
         # Structured attributes: redact by key only (I1)
@@ -440,9 +414,7 @@ class RedactingLogExporter(LogRecordExporter):
             attributes=redacted_attrs,
             body=redacted_body,
         )
-        return _RedactedAttributesProxy(
-            record, log_record=redacted_log_record
-        )
+        return _RedactedAttributesProxy(record, log_record=redacted_log_record)
 
     def shutdown(self) -> None:
         self._exporter.shutdown()

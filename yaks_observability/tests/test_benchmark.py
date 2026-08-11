@@ -32,15 +32,19 @@ class TestBenchmark:
     def test_setup_overhead(self) -> None:
         """Measure startup overhead. Target: <100ms."""
         app = FastAPI()
-        with patch(
-            "yaks_observability.instrumentation.otlp_traces_http.OTLPSpanExporter",
-            _FakeExporter,
-        ), patch(
-            "yaks_observability.instrumentation.otlp_metrics_http.OTLPMetricExporter",
-            _FakeExporter,
-        ), patch(
-            "opentelemetry.exporter.otlp.proto.http._log_exporter.OTLPLogExporter",
-            _FakeExporter,
+        with (
+            patch(
+                "yaks_observability.instrumentation.otlp_traces_http.OTLPSpanExporter",
+                _FakeExporter,
+            ),
+            patch(
+                "yaks_observability.instrumentation.otlp_metrics_http.OTLPMetricExporter",
+                _FakeExporter,
+            ),
+            patch(
+                "opentelemetry.exporter.otlp.proto.http._log_exporter.OTLPLogExporter",
+                _FakeExporter,
+            ),
         ):
             start = time.perf_counter()
             setup(app)
@@ -50,15 +54,19 @@ class TestBenchmark:
     def test_lifespan_attached(self) -> None:
         """Ensure lifespan is registered after setup."""
         app = FastAPI()
-        with patch(
-            "yaks_observability.instrumentation.otlp_traces_http.OTLPSpanExporter",
-            _FakeExporter,
-        ), patch(
-            "yaks_observability.instrumentation.otlp_metrics_http.OTLPMetricExporter",
-            _FakeExporter,
-        ), patch(
-            "opentelemetry.exporter.otlp.proto.http._log_exporter.OTLPLogExporter",
-            _FakeExporter,
+        with (
+            patch(
+                "yaks_observability.instrumentation.otlp_traces_http.OTLPSpanExporter",
+                _FakeExporter,
+            ),
+            patch(
+                "yaks_observability.instrumentation.otlp_metrics_http.OTLPMetricExporter",
+                _FakeExporter,
+            ),
+            patch(
+                "opentelemetry.exporter.otlp.proto.http._log_exporter.OTLPLogExporter",
+                _FakeExporter,
+            ),
         ):
             setup(app)
         assert app.router.lifespan_context is not None

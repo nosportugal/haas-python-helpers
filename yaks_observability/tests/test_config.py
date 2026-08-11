@@ -20,7 +20,7 @@ class TestObservabilityConfig:
         assert config.sampler_arg == "1.0"
         assert config.testing_mode is False
 
-    @patch.dict(os.environ, {"SERVICE_MANAGEMENT_ENVIRONMENT": "prod"}, clear=True)
+    @patch.dict(os.environ, {"ENVIRONMENT_TYPE": "prod"}, clear=True)
     def test_prod_overrides(self) -> None:
         config = ObservabilityConfig.from_env()
         assert config.environment == Environment.PROD
@@ -30,7 +30,7 @@ class TestObservabilityConfig:
 
     @patch.dict(
         os.environ,
-        {"SERVICE_MANAGEMENT_ENVIRONMENT": "testing", "OTEL_SERVICE_NAME": "test-svc"},
+        {"ENVIRONMENT_TYPE": "testing", "OTEL_SERVICE_NAME": "test-svc"},
         clear=True,
     )
     def test_testing_mode(self) -> None:
@@ -85,7 +85,7 @@ class TestServiceIdentityAttributes:
     @patch.dict(
         os.environ,
         {
-            "SERVICE_MANAGEMENT_ENVIRONMENT": "prod",
+            "ENVIRONMENT_TYPE": "prod",
             "OTEL_SERVICE_VERSION": "2.4.1",
             "OTEL_SERVICE_INSTANCE_ID": "pod-xyz",
         },
@@ -98,7 +98,7 @@ class TestServiceIdentityAttributes:
 
     @patch.dict(
         os.environ,
-        {"SERVICE_MANAGEMENT_ENVIRONMENT": "prod"},
+        {"ENVIRONMENT_TYPE": "prod"},
         clear=True,
     )
     def test_service_instance_id_defaults_to_hostname(self) -> None:

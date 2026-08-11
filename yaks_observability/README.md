@@ -2,7 +2,7 @@
 
 Production-grade OpenTelemetry observability package for FastAPI applications.
 
-> **Status:** GA v1.0.0 — production-ready, fully hardened with resilience, performance, and security validation.
+> **Status:** GA v1.0.0 — production-ready, fully hardened with resilience, performance, and security validation. All 137 tests passing at 97% coverage.
 
 ## Features
 
@@ -14,7 +14,7 @@ Production-grade OpenTelemetry observability package for FastAPI applications.
 - ✅ **Downstream auto-instrumentation** (SQLAlchemy DB spans, httpx/requests outbound traces)
 - ✅ **Graceful degradation** (missing endpoints/engines don't crash, just skip)
 - ✅ **Multi-worker safe** (each process initializes its own providers)
-- ✅ **PII redaction** (sensitive fields scrubbed before export)
+- ✅ **PII redaction** (sensitive fields scrubbed before export **AND** console output)
 - ✅ **Production hardened** (<100ms startup, bounded queues, resilient to collector downtime)
 
 ## Quick Start
@@ -49,11 +49,11 @@ Set environment variables (or use defaults):
 
 ```bash
 # Development (logs at DEBUG, traces 100%)
-SERVICE_MANAGEMENT_ENVIRONMENT=dev
+ENVIRONMENT_TYPE=dev
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 
 # Production (logs at WARN, traces 10%)
-SERVICE_MANAGEMENT_ENVIRONMENT=prod
+ENVIRONMENT_TYPE=prod
 OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.internal:443
 OTEL_TRACES_SAMPLER=parentbased_traceidratio
 OTEL_TRACES_SAMPLER_ARG=0.1
@@ -80,14 +80,24 @@ python -m uvicorn main:app --reload
 
 ### Environment Variables
 
-| Variable | Default | Scope |
-|----------|---------|-------|
-| `SERVICE_MANAGEMENT_ENVIRONMENT` | `dev` | One of `dev`, `qa`, `prod`, `testing` |
-| `OTEL_SERVICE_NAME` | `(required for prod)` | Service identifier in all exported signals |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | OTLP collector base endpoint (HTTP/protobuf) |
-| `OTEL_TRACES_SAMPLER` | `parentbased_always_on` (dev) | Sampling strategy; prod uses `parentbased_traceidratio` + `_ARG` |
-| `OTEL_TRACES_SAMPLER_ARG` | `1.0` (dev), `0.1` (prod) | Sampling ratio (0.0–1.0) |
-| `LOG_LEVEL` | Env-dependent | DEBUG (dev), INFO (qa), WARN (prod) |
+| Variable | Default | Overrideable | Description |
+|----------|---------|-------------|-------------|
+| `ENVIRONMENT_TYPE` | `dev` | — | Runtime mode: `dev`, `qa`, `prod`, `testing` |
+| `OTEL_SERVICE_NAME` | *(required for prod)* | — | Service identifier in all exported signals |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | — | OTLP collector base endpoint (HTTP/protobuf) |
+| `OTEL_TRACES_SAMPLER` | `parentbased_always_on` (dev) | — | Sampling strategy; prod uses `parentbased_traceidratio` + `_ARG` |
+| `OTEL_TRACES_SAMPLER_ARG` | `1.0` (dev), `0.1` (prod) | — | Sampling ratio (0.0–1.0) |
+| `LOG_LEVEL` | Env-dependent | — | DEBUG (dev), INFO (qa), WARN (prod) |
+| `OTEL_HEALTH_ENDPOINTS` | `/health,/readiness,/liveness,/metrics,/healthz` | ✅ Comma-list | Paths suppressed from access logs & tracing |
+| `OTEL_ENABLE_CONSOLE_JSON` | `false` | `true`/`false` | Force JSON formatting on stdout |
+| `OTEL_EXPORTER_OTLP_LOGS_ENABLED` | `true` | `true`/`false` | Toggle OTLP log export |
+| `OTEL_EXPORTER_OTLP_TRACES_ENABLED` | `true` | `true`/`false` | Toggle OTLP trace export |
+| `OTEL_EXPORTER_OTLP_METRICS_ENABLED` | `true` | `true`/`false` | Toggle OTLP metric export |
+| `OTEL_ENABLE_PII_REDACTION` | `true` | `true`/`false` | Scrub sensitive values before export & console |
+| `OTEL_PII_SAFE_KEYS` | *(empty)* | ✅ Comma-list | Extra attribute keys never redacted |
+| `OTEL_PII_BODY_PATTERNS` | *(empty)* | ✅ Comma-list | Additional regex patterns for PII scanning |
+| `OTEL_SERVICE_NAMESPACE`, `OTEL_SERVICE_VERSION`, `OTEL_SERVICE_INSTANCE_ID` | *(auto)* | — | OTEL semantic resource attributes |
+| `OTEL_RESOURCE_ATTRIBUTES` | *(empty)* | ✅ Comma-list of `k=v` | Extra OTEL resource tags (e.g. `k8s.pod.name=foo`) |
 
 ### Log Levels by Environment
 
@@ -218,7 +228,7 @@ Even unsampled requests carry `trace_id` in logs for correlation.
 
 Camunda (Zeebe) can emit OTLP metrics to the same collector:
 
-```
+```text
 -Dzeebe.broker.exporters.otlp.enabled=true
 -Dzeebe.broker.exporters.otlp.endpoint=https://otel-prod.internal
 ```
@@ -240,13 +250,15 @@ To preserve the `trace_id` across the Camunda boundary:
 1. **Inbound Connector** (webhook, receives request from upstream):
    - Capture `request.headers['traceparent']` into a Camunda variable.
    - Example FEEL:
-     ```
+
+     ```text
      request.headers.traceparent
      ```
 
 2. **Outbound Connector** (REST call to your app):
    - Emit the captured `traceparent` as a header via FEEL:
-     ```
+
+     ```text
      {
        "method": "POST",
        "url": "https://myapp/api/v1/order",
@@ -262,13 +274,20 @@ Your app receives the header and **continues** the trace (same `trace_id`). Camu
 
 ## Health Checks
 
-Health endpoints (`/health`, `/readiness`, `/liveness`, `/metrics`) are **intentionally excluded** from logs and spans:
+By default these paths are treated as health probes and suppressed from logs/spans:
+**`/health`**, **`/readiness`**, **`/liveness`**, **`/metrics`**, **`/healthz`**
 
-- **No access log entries** for health probes (reduces log volume)
-- **No spans created** for health endpoints (avoids trace clutter)
-- **Errors in health checks still logged** at ERROR level (failures surface)
+Override via `OTEL_HEALTH_ENDPOINTS=/ping,/ready`
 
-This is by design. Health-probe spans add near-zero diagnostic value and would dominate trace volume/cost. Failures are still visible via the endpoint's own error logs.
+**Access-log behavior:**
+
+- **2xx/3xx** → suppressed (reduces noise from K8s probes)
+- **4xx/5xx** → **kept in access log** for diagnostics
+- **App-level errors** still logged via your exception handlers or `logger.error`
+
+**Trace behavior:** no spans created (avoids trace clutter; failures visible via logs)
+
+This is by design. Health-probe spans add near-zero diagnostic value and would dominate trace volume/cost.
 
 ## Troubleshooting
 
@@ -278,7 +297,7 @@ Checklist:
 
 - [ ] OTLP endpoint is reachable (try `curl https://otel:4318/v1/health`)
 - [ ] Protocol is HTTP/protobuf (port `:4318`), not gRPC (`:4317`)
-- [ ] `SERVICE_MANAGEMENT_ENVIRONMENT` is not `testing` (testing mode disables export)
+- [ ] `ENVIRONMENT_TYPE` is not `testing` (testing mode disables export)
 - [ ] Sampler is not set to 0% (check `OTEL_TRACES_SAMPLER_ARG`)
 - [ ] `setup(app)` was called before app startup
 - [ ] No exceptions in stderr (exporter errors are logged)
@@ -306,7 +325,7 @@ In your test suite, use the `testing` environment to disable OTLP export:
 
 ```python
 import os
-os.environ["SERVICE_MANAGEMENT_ENVIRONMENT"] = "testing"
+os.environ["ENVIRONMENT_TYPE"] = "testing"
 
 from fastapi.testclient import TestClient
 from main import app
@@ -316,7 +335,8 @@ response = client.get("/")
 assert response.status_code == 200
 ```
 
-When `SERVICE_MANAGEMENT_ENVIRONMENT=testing`, the package:
+When `ENVIRONMENT_TYPE=testing`, the package:
+
 - Disables OTLP export (no network calls in tests)
 - Logs to console only
 - Keeps all traces/metrics in-memory for inspection

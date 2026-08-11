@@ -11,7 +11,7 @@ authors = [
     { name = "NOS Team", email = "team@nos.pt" },
 ]
 readme = "README.md"
-requires-python = ">=3.13,<4.0"
+requires-python = ">=3.11,<4.0"
 license = { text = "MIT" }
 keywords = [
     "opentelemetry",
@@ -71,6 +71,9 @@ Issues = "https://github.com/nosportugal/haas-python-helpers/issues"
 packages = [
     { include = "yaks_observability", from = "src" },
 ]
+include = [
+    "src/yaks_observability/py.typed",
+]
 
 [tool.poetry.group.dev.dependencies]
 httpx = "^0.28.1"
@@ -87,6 +90,7 @@ ignore = ["E203", "PLC2701"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR2004", "PLR6301", "PLR0913", "PLC0415", "PLR0904"]
 "src/yaks_observability/instrumentation.py" = ["PLR0402", "PLC0415"]
+"src/yaks_observability/logging_config.py" = ["PLC0415", "PLR6301"]
 
 [tool.ruff.format]
 quote-style = "double"

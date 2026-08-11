@@ -81,7 +81,7 @@ class ObservabilityConfig:
     @classmethod
     def from_env(cls) -> ObservabilityConfig:  # noqa: PLR0914
         """Build configuration from environment variables with sensible defaults."""
-        env_raw = os.getenv("SERVICE_MANAGEMENT_ENVIRONMENT", "dev").lower()
+        env_raw = os.getenv("ENVIRONMENT_TYPE", "dev").lower()
         try:
             environment = Environment(env_raw)
         except ValueError:
@@ -109,9 +109,7 @@ class ObservabilityConfig:
             socket.gethostname()
         )
         pii_safe_keys = _parse_comma_list(os.getenv("OTEL_PII_SAFE_KEYS", ""))
-        pii_body_patterns = _parse_comma_list(
-            os.getenv("OTEL_PII_BODY_PATTERNS", "")
-        )
+        pii_body_patterns = _parse_comma_list(os.getenv("OTEL_PII_BODY_PATTERNS", ""))
 
         return cls(
             environment=environment,

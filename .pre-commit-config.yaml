@@ -37,8 +37,3 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
-
-  - repo: https://github.com/wemake-services/wemake-python-styleguide
-    rev: 1.6.2
-    hooks:
-      - id: wemake-python-styleguide

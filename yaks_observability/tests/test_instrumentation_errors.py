@@ -151,6 +151,7 @@ class TestResolveSampler:
         # instrument_fastapi directly with a side_effect on the actual import.
         # Simpler: use patch on the module's local import context via patch.dict
         import sys
+
         fake = MagicMock()
         fake.FastAPIInstrumentor.instrument_app.side_effect = RuntimeError("boom")
         with patch.dict(sys.modules, {"opentelemetry.instrumentation.fastapi": fake}):

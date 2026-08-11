@@ -30,7 +30,9 @@ class TestCreateNewPageWidthHandling:
         )
 
         events: list[str] = []
-        mock_apply_metadata.side_effect = lambda *args, **kwargs: events.append("metadata")
+        mock_apply_metadata.side_effect = lambda *args, **kwargs: events.append(
+            "metadata"
+        )
         mock_apply_width.side_effect = lambda *args, **kwargs: events.append("width")
 
         page_id, action = _create_new_page(confluence, request)

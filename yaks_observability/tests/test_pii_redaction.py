@@ -95,7 +95,7 @@ class TestPIIRedactionProcessor:
     def test_scrub_text_quoted_values(self) -> None:
         r = PIIRedactionProcessor()
         # double-quoted
-        assert r.scrub_text('token="abc123xyz"') == 'token=' + self.REDACTED
+        assert r.scrub_text('token="abc123xyz"') == "token=" + self.REDACTED
         # single-quoted
         assert r.scrub_text("password='secret'") == "password=" + self.REDACTED
         # unquoted
@@ -359,7 +359,5 @@ class TestPIIRedactionProcessor:
         r = PIIRedactionProcessor()
         result = r.scrub_text("email=a@b.com&token=" + "x" * 6 + "&ok=true")
         assert "]]" not in result
-        expected = (
-            "email=" + self.REDACTED + "&token=" + self.REDACTED + "&ok=true"
-        )
+        expected = "email=" + self.REDACTED + "&token=" + self.REDACTED + "&ok=true"
         assert result == expected

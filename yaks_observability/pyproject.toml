@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "yaks-observability"
-version = "1.0.0"
+version = "1.1.0"
 description = "Production-grade OpenTelemetry observability package for FastAPI apps with environment-aware logging, health filtering, and automatic distributed tracing."
 authors = [
     { name = "Gustavo Carneiro", email = "gustavo.carneiro@parceiros.nos.pt" },
@@ -43,6 +43,7 @@ dependencies = [
     "opentelemetry-sdk>=1.44.0",
     "opentelemetry-exporter-otlp-proto-http>=1.44.0",
     "opentelemetry-instrumentation-fastapi>=0.65b0",
+    "opentelemetry-propagator-b3>=1.14.0",
     "opentelemetry-instrumentation-logging>=0.65b0",
     "python-json-logger>=4.1.0",
 ]
@@ -89,8 +90,9 @@ ignore = ["E203", "PLC2701"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR2004", "PLR6301", "PLR0913", "PLC0415", "PLR0904"]
-"src/yaks_observability/instrumentation.py" = ["PLR0402", "PLC0415"]
+"src/yaks_observability/instrumentation.py" = ["PLR0402", "PLC0415", "PLR6301"]
 "src/yaks_observability/logging_config.py" = ["PLC0415", "PLR6301"]
+"src/yaks_observability/setup.py" = ["PLC0415"]
 
 [tool.ruff.format]
 quote-style = "double"

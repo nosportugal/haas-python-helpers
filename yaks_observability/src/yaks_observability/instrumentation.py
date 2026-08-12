@@ -7,12 +7,12 @@ import os
 import re
 from typing import TYPE_CHECKING
 
-from opentelemetry import metrics, trace
+from opentelemetry import metrics, propagate, trace
 from opentelemetry.exporter.otlp.proto.http import (
     metric_exporter as otlp_metrics_http,
     trace_exporter as otlp_traces_http,
 )
-from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs import LogRecordProcessor, LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
@@ -25,6 +25,7 @@ from opentelemetry.sdk.trace.sampling import (
     ParentBasedTraceIdRatio,
 )
 from opentelemetry.semconv.resource import ResourceAttributes
+from opentelemetry.trace import format_span_id, format_trace_id
 
 from .config import ObservabilityConfig
 from .instrumentors import suppress_otel_errors
@@ -40,6 +41,32 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
+
+
+class _TraceEnrichingLogProcessor(LogRecordProcessor):
+    """Copy trace_id / span_id into log attributes for APM correlation.
+
+    Many APM backends index ``attributes.trace_id`` (not the top-level
+    ``trace_id`` field) for log-to-trace correlation. This processor ensures
+    both values are present.
+    """
+
+    def on_emit(
+        self,
+        log_record: object,
+    ) -> None:  # type: ignore[override]
+        """Inject trace_id / span_id as attributes on the log record."""
+        lr = log_record.log_record
+        if lr.trace_id and lr.trace_id != 0:
+            lr.attributes["trace_id"] = format_trace_id(lr.trace_id)
+        if lr.span_id and lr.span_id != 0:
+            lr.attributes["span_id"] = format_span_id(lr.span_id)
+
+    def shutdown(self) -> None:
+        pass
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:  # type: ignore[override]
+        return True
 
 
 def _build_resource(config: ObservabilityConfig) -> Resource:
@@ -176,6 +203,7 @@ def _create_log_provider(
     )
 
     provider = LoggerProvider(resource=resource)
+    provider.add_log_record_processor(_TraceEnrichingLogProcessor())
     exporter_kwargs = get_exporter_kwargs()
     # Only pass endpoint explicitly when a signal-specific env var is set.
     # If omitted, the SDK auto-appends /v1/logs to OTEL_EXPORTER_OTLP_ENDPOINT.
@@ -255,6 +283,35 @@ def _build_metrics_provider(
     return MeterProvider(resource=resource, metric_readers=[reader])
 
 
+class _TraceResponseMiddleware:
+    """ASGI middleware that injects current trace context into response headers.
+
+    This allows upstream callers to read the ``traceparent`` (and optionally
+    B3) headers from every HTTP response, enabling downstream correlation.
+    """
+
+    def __init__(self, app) -> None:  # type: ignore[no-untyped-def]
+        self.app = app
+
+    async def __call__(self, scope, receive, send):  # type: ignore[no-untyped-def]
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def _send_with_trace(message):  # type: ignore[no-untyped-def]
+            if message["type"] == "http.response.start":
+                # Inject active span context into response headers.
+                carrier: dict[str, str] = {}
+                propagate.get_global_textmap().inject(carrier)
+                headers = list(message.get("headers", []))
+                for key, value in carrier.items():
+                    headers.append((key.encode("utf-8"), value.encode("utf-8")))
+                message["headers"] = headers
+            await send(message)
+
+        await self.app(scope, receive, _send_with_trace)
+
+
 def instrument_fastapi(
     app: FastAPI,
     config: ObservabilityConfig,
@@ -263,6 +320,10 @@ def instrument_fastapi(
     from opentelemetry.instrumentation.fastapi import (  # noqa: PLC0415
         FastAPIInstrumentor,
     )
+
+    # Add response trace header middleware BEFORE instrumentation so
+    # returned headers are visible to callers.
+    app.add_middleware(_TraceResponseMiddleware)
 
     try:
         excluded = ",".join(config.health_endpoints)

@@ -60,7 +60,6 @@ class ObservabilityConfig:
 
     environment: Environment
     service_name: str
-    otlp_endpoint: str
     log_level: str
     sampler: str
     sampler_arg: str
@@ -71,6 +70,10 @@ class ObservabilityConfig:
     enable_otlp_metrics: bool
     enable_pii_redaction: bool
     testing_mode: bool
+    otlp_endpoint: str = ""
+    otlp_traces_endpoint: str = ""
+    otlp_logs_endpoint: str = ""
+    otlp_metrics_endpoint: str = ""
     service_namespace: str = ""
     service_version: str = ""
     service_instance_id: str = ""
@@ -91,9 +94,10 @@ class ObservabilityConfig:
         service_name = os.getenv("OTEL_SERVICE_NAME", "")
         if not service_name and not testing_mode:
             service_name = "unknown-service"
-        otlp_endpoint = os.getenv(
-            "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318"
-        )
+        otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+        otlp_traces_endpoint = os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
+        otlp_logs_endpoint = os.getenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "")
+        otlp_metrics_endpoint = os.getenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT", "")
         log_level = os.getenv("LOG_LEVEL", DEFAULT_LOG_LEVELS[environment])
         default_sampler, default_arg = DEFAULT_SAMPLERS[environment]
         sampler = os.getenv("OTEL_TRACES_SAMPLER", default_sampler)
@@ -118,6 +122,9 @@ class ObservabilityConfig:
             service_version=service_version,
             service_instance_id=service_instance_id,
             otlp_endpoint=otlp_endpoint,
+            otlp_traces_endpoint=otlp_traces_endpoint,
+            otlp_logs_endpoint=otlp_logs_endpoint,
+            otlp_metrics_endpoint=otlp_metrics_endpoint,
             log_level=log_level,
             sampler=sampler,
             sampler_arg=sampler_arg,

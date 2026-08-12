@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from types import ModuleType
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("yaks_observability.instrumentors")
 
 
 def safe_import(module_path: str) -> ModuleType | None:

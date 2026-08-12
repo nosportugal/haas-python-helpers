@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from .config import ObservabilityConfig
-from .graceful_degradation import (
+from .instrumentors import (
     instrument_httpx,
     instrument_requests,
     instrument_sqlalchemy,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from yaks_observability.graceful_degradation import (
+from yaks_observability.instrumentors import (
     instrument_httpx,
     instrument_requests,
     instrument_sqlalchemy,
@@ -58,7 +58,7 @@ class TestInstrumentorsWithMockDeps:
     def test_sqlalchemy_success(self) -> None:
         mock_mod, mock_inst = self._mock_module("SQLAlchemyInstrumentor")
         with patch(
-            "yaks_observability.graceful_degradation.safe_import",
+            "yaks_observability.instrumentors.safe_import",
             return_value=mock_mod,
         ):
             instrument_sqlalchemy("fake_engine")
@@ -69,7 +69,7 @@ class TestInstrumentorsWithMockDeps:
             "SQLAlchemyInstrumentor", RuntimeError("boom")
         )
         with patch(
-            "yaks_observability.graceful_degradation.safe_import",
+            "yaks_observability.instrumentors.safe_import",
             return_value=mock_mod,
         ):
             instrument_sqlalchemy("fake_engine")
@@ -78,7 +78,7 @@ class TestInstrumentorsWithMockDeps:
     def test_httpx_success(self) -> None:
         mock_mod, mock_inst = self._mock_module("HTTPXClientInstrumentor")
         with patch(
-            "yaks_observability.graceful_degradation.safe_import",
+            "yaks_observability.instrumentors.safe_import",
             return_value=mock_mod,
         ):
             instrument_httpx()
@@ -89,7 +89,7 @@ class TestInstrumentorsWithMockDeps:
             "HTTPXClientInstrumentor", RuntimeError("boom")
         )
         with patch(
-            "yaks_observability.graceful_degradation.safe_import",
+            "yaks_observability.instrumentors.safe_import",
             return_value=mock_mod,
         ):
             instrument_httpx()
@@ -98,7 +98,7 @@ class TestInstrumentorsWithMockDeps:
     def test_requests_success(self) -> None:
         mock_mod, mock_inst = self._mock_module("RequestsInstrumentor")
         with patch(
-            "yaks_observability.graceful_degradation.safe_import",
+            "yaks_observability.instrumentors.safe_import",
             return_value=mock_mod,
         ):
             instrument_requests()
@@ -109,7 +109,7 @@ class TestInstrumentorsWithMockDeps:
             "RequestsInstrumentor", RuntimeError("boom")
         )
         with patch(
-            "yaks_observability.graceful_degradation.safe_import",
+            "yaks_observability.instrumentors.safe_import",
             return_value=mock_mod,
         ):
             instrument_requests()

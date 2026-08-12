@@ -15,7 +15,7 @@ class TestObservabilityConfig:
         config = ObservabilityConfig.from_env()
         assert config.environment == Environment.DEV
         assert config.log_level == "DEBUG"
-        assert config.otlp_endpoint == "http://localhost:4318"
+        assert not config.otlp_endpoint
         assert config.sampler == "parentbased_always_on"
         assert config.sampler_arg == "1.0"
         assert config.testing_mode is False
@@ -47,6 +47,7 @@ class TestObservabilityConfig:
             "OTEL_TRACES_SAMPLER_ARG": "0.75",
             "LOG_LEVEL": "ERROR",
             "OTEL_HEALTH_ENDPOINTS": "/ping,/ready",
+            "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4318",
         },
         clear=True,
     )

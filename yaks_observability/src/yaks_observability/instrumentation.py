@@ -27,7 +27,7 @@ from opentelemetry.sdk.trace.sampling import (
 from opentelemetry.semconv.resource import ResourceAttributes
 
 from .config import ObservabilityConfig
-from .graceful_degradation import suppress_otel_errors
+from .instrumentors import suppress_otel_errors
 from .logging_config import _OtelInternalFilter
 from .pii_redaction import (
     PIIRedactionProcessor,
@@ -141,11 +141,10 @@ def _create_trace_exporter(config: ObservabilityConfig):
     from .resilience import get_exporter_kwargs
 
     kwargs = get_exporter_kwargs()
-    # Let the SDK derive the full signal endpoint from standard env vars
-    # (OTEL_EXPORTER_OTLP_TRACES_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT)
-    # unless an explicit endpoint is configured.
-    if config.otlp_endpoint:
-        kwargs["endpoint"] = config.otlp_endpoint
+    # Only pass endpoint explicitly when a signal-specific env var is set.
+    # If omitted, the SDK auto-appends /v1/traces to OTEL_EXPORTER_OTLP_ENDPOINT.
+    if config.otlp_traces_endpoint:
+        kwargs["endpoint"] = config.otlp_traces_endpoint
     return otlp_traces_http.OTLPSpanExporter(**kwargs)
 
 
@@ -178,8 +177,10 @@ def _create_log_provider(
 
     provider = LoggerProvider(resource=resource)
     exporter_kwargs = get_exporter_kwargs()
-    if config.otlp_endpoint:
-        exporter_kwargs["endpoint"] = config.otlp_endpoint
+    # Only pass endpoint explicitly when a signal-specific env var is set.
+    # If omitted, the SDK auto-appends /v1/logs to OTEL_EXPORTER_OTLP_ENDPOINT.
+    if config.otlp_logs_endpoint:
+        exporter_kwargs["endpoint"] = config.otlp_logs_endpoint
     exporter = OTLPLogExporter(**exporter_kwargs)
     if config.enable_pii_redaction:
         exporter = RedactingLogExporter(
@@ -245,8 +246,10 @@ def _build_metrics_provider(
     from .resilience import get_exporter_kwargs
 
     kwargs = get_exporter_kwargs()
-    if config is not None and config.otlp_endpoint:
-        kwargs["endpoint"] = config.otlp_endpoint
+    # Only pass endpoint explicitly when a signal-specific env var is set.
+    # If omitted, the SDK auto-appends /v1/metrics to OTEL_EXPORTER_OTLP_ENDPOINT.
+    if config is not None and config.otlp_metrics_endpoint:
+        kwargs["endpoint"] = config.otlp_metrics_endpoint
     exporter = otlp_metrics_http.OTLPMetricExporter(**kwargs)
     reader = PeriodicExportingMetricReader(exporter, export_interval_millis=60000)
     return MeterProvider(resource=resource, metric_readers=[reader])

@@ -3,6 +3,10 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from opentelemetry import propagate
+from opentelemetry.propagators.composite import CompositePropagator
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
 from .config import ObservabilityConfig
 from .instrumentors import (
     instrument_httpx,
@@ -25,6 +29,31 @@ logger = logging.getLogger(__name__)
 
 # Module-level flag for idempotency (replaced monkeypatching on stdlib logging)
 _setup_called: bool = False
+
+
+def _configure_propagators() -> None:
+    """Register W3C tracecontext + B3 propagators for distributed tracing.
+
+    OTel reads ``OTEL_PROPAGATORS`` env var by default, but the package
+    explicitly sets a composite so that:
+    - W3C ``traceparent`` headers work (our NOS Istio default)
+    - B3 ``x-b3-*`` headers work (Google Cloud/legacy interop)
+    - ``baggage`` propagation works for cross-service context
+    This is idempotent — repeated calls have no side effects.
+    """
+    try:
+        from opentelemetry.propagators.b3 import B3MultiFormat
+
+        b3 = B3MultiFormat()
+    except ImportError:
+        b3 = None  # optional dependency, B3 headers silently ignored if missing
+        logger.debug("opentelemetry-propagator-b3 not installed; B3 headers ignored")
+
+    propagators: list[TraceContextTextMapPropagator] = [TraceContextTextMapPropagator()]
+    if b3 is not None:
+        propagators.append(b3)
+    propagate.set_global_textmap(CompositePropagator(propagators))
+    logger.debug("Propagators configured: tracecontext%s", " + b3" if b3 else "")
 
 
 def setup(  # noqa: PLR0913
@@ -72,6 +101,8 @@ def setup(  # noqa: PLR0913
     metric_provider = None
 
     if not resolved.testing_mode:
+        _configure_propagators()
+
         from .instrumentation import _build_resource  # noqa: PLC0415
 
         resource = _build_resource(resolved)

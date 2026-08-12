@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "yaks-observability"
-version = "1.0.0"
+version = "1.1.0"
 description = "Production-grade OpenTelemetry observability package for FastAPI apps with environment-aware logging, health filtering, and automatic distributed tracing."
 authors = [
     { name = "Gustavo Carneiro", email = "gustavo.carneiro@parceiros.nos.pt" },

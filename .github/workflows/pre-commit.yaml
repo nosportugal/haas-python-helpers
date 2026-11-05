@@ -1,4 +1,4 @@
-name: Pre-commit Checks
+name: ➡️ Pre-commit Checks
 run-name: Run pre-commit hooks on pull request ${{ github.event.pull_request.number }}
 
 on:

@@ -1,4 +1,4 @@
-name: CI — yaks-observability
+name: ➡️ CI — yaks-observability
 
 on:
   push:

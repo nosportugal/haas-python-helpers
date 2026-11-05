@@ -1,4 +1,4 @@
-name: Build sync_confluence
+name: ➡️ Build sync_confluence
 
 on:
   push:

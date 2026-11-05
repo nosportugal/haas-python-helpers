@@ -1,4 +1,4 @@
-name: Build otel_log_wrapper
+name: ➡️ Build otel_log_wrapper
 
 on:
   push:

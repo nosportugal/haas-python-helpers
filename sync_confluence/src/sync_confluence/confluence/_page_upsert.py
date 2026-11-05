@@ -7,13 +7,13 @@ from typing import Optional
 from atlassian import Confluence
 
 from sync_confluence.confluence._attachments import upload_attachments
-from sync_confluence.confluence._constants import _DRY_RUN_ID, _Actions, _Keys
+from sync_confluence.confluence._constants import _Actions, _Keys
 from sync_confluence.confluence._logging import _suppress_atlassian_not_found, log
 from sync_confluence.confluence._lookup import _find_page_under_parent
+from sync_confluence.confluence._page_dry_run import _upsert_page_dry_run
 from sync_confluence.confluence._page_metadata import (
     _apply_page_metadata,
     _apply_page_width,
-    _log_dry_run_metadata,
     _rename_target,
 )
 from sync_confluence.confluence._properties import (
@@ -31,26 +31,6 @@ def _apply_attachments(
         upload_attachments(
             confluence, page_id, request.attachments, dry_run=request.dry_run
         )
-
-
-def _upsert_page_dry_run(
-    confluence: Confluence, request: PageUpsertRequest
-) -> tuple[str, str]:
-    """Simulate :func:`upsert_page` for dry-run mode."""
-    existing = _find_page_under_parent(
-        confluence, request.space_key, request.title, request.parent_id
-    )
-    rename_id = None if existing else _rename_target(request)
-    if rename_id is not None:
-        log.info(
-            "[DRY-RUN] Would rename page id=%s to '%s' and update content",
-            rename_id,
-            request.title,
-        )
-        _log_dry_run_metadata(request)
-        return (_DRY_RUN_ID, _Actions.UPDATED)
-    _log_dry_run_metadata(request)
-    return (_DRY_RUN_ID, _Actions.CREATED)
 
 
 def _handle_page_rename(

@@ -23,6 +23,7 @@ class PageUpsertRequest:
     source_path_map: Optional[dict[str, str]] = None
     page_width: Optional[str] = None
     attachments: list[Attachment] = field(default_factory=list)
+    labels: list[str] = field(default_factory=list)
 
 
 @dataclass

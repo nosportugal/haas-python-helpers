@@ -140,6 +140,42 @@ A named container folder with the given title is found under `--parent-id` (or c
 - Any `README.md` inside a subdirectory becomes a regular child page under that folder, not a section parent.
 - All other `.md` files become leaf pages under their respective folder or parent.
 
+## Test specifications from Excel (`sync-confluence-testspec`)
+
+Publishes a test-specification workbook (`.xlsx`) as one Confluence page per test case,
+grouped in one folder per vendor under `--parent-id`. Requires the `xlsx` extra:
+
+```bash
+pip install "sync-confluence[xlsx] @ git+https://github.com/nosportugal/haas-python-helpers.git#subdirectory=sync_confluence"
+
+sync-confluence-testspec --xlsx "Testes serviço L3VPN - Cisco.xlsx" --space HaaS --parent-id 12345 --dry-run
+```
+
+Workbook layout (headers are matched case-insensitively; the first non-empty row of each sheet is the header row):
+
+| Sheet                   | Columns                                                               | Notes                                                                                                                          |
+| ----------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `Index`                 | `Test ID`, `Name`, `Description`, `Type`, `Vendor`, `Tags` (optional) | `Test ID` is `n.n` and must be formatted as Text. `Type` is `Create`, `Modify` or `Delete`. `Tags` are separated by `;` or `,` |
+| `Parameters` (optional) | `Parameter` plus any catalog columns (type, default, …)               | Every catalog parameter is listed on every test page                                                                           |
+| `<id> - Inputs`         | `Parameter`, `Value`, plus any extra columns                          | Parameters must exist in `Parameters` when that sheet is present                                                               |
+| `<id> - Outputs`        | `JSON`, plus any extra columns (e.g. `CLI`)                           | One row per expected JSON document; multi-line cells. `JSON` must be valid and is pretty-printed                               |
+
+Missing `Inputs`/`Outputs` sheets render as "Not specified yet."; sheets that match no `Test ID` fail the run.
+The workbook is fully validated before any Confluence call.
+
+Each page is titled `<id> - <name> (<vendor>)` and contains Vendor, Type and Tags, the
+description, the Inputs table and the Outputs table (`CLI` and `JSON` cells as code
+macros). Vendor, type and tags are also applied as page labels.
+Labels are added, never removed, when tags change.
+
+`sync-confluence-testspec` accepts the connection, `--dry-run`, `--managed-by`, `--log-level`,
+`--page-width`, `--generated-by` and `--no-generated-by` options described above, plus:
+
+- `--xlsx` / `TESTSPEC_XLSX`: Path to the workbook — **required**
+
+Orphan cleanup works as for Markdown sync: managed pages and vendor folders under `--parent-id`
+that are no longer in the workbook are **permanently deleted**.
+
 ## Development
 
 First-time setup:
@@ -182,17 +218,17 @@ Add the following steps to your workflow to sync docs on every push to `main`:
 
 Required GitHub repository secrets (`Settings → Secrets and variables → Actions`):
 
-| Secret | Value |
-| --- | --- |
-| `CONFLUENCE_URL` | `https://<tenant>.atlassian.net` |
-| `CONFLUENCE_EMAIL` | Atlassian account email |
-| `CONFLUENCE_API_TOKEN` | API token from id.atlassian.com |
+| Secret                 | Value                            |
+| ---------------------- | -------------------------------- |
+| `CONFLUENCE_URL`       | `https://<tenant>.atlassian.net` |
+| `CONFLUENCE_EMAIL`     | Atlassian account email          |
+| `CONFLUENCE_API_TOKEN` | API token from id.atlassian.com  |
 
 Required GitHub repository variables (same settings page, `Variables` tab):
 
-| Variable | Value |
-| --- | --- |
-| `CONFLUENCE_SPACE_KEY` | Target space key (e.g. `DOCS`) |
+| Variable                    | Value                                      |
+| --------------------------- | ------------------------------------------ |
+| `CONFLUENCE_SPACE_KEY`      | Target space key (e.g. `DOCS`)             |
 | `CONFLUENCE_PARENT_PAGE_ID` | Numeric ID of the pre-existing parent page |
 
 ## License

@@ -20,8 +20,13 @@ dependencies = [
     "pymdown-extensions>=10.0",
 ]
 
+[project.optional-dependencies]
+# Only the sync-confluence-testspec entry point reads .xlsx workbooks.
+xlsx = ["openpyxl>=3.1"]
+
 [project.scripts]
 sync-confluence = "sync_confluence.cli:main"
+sync-confluence-testspec = "sync_confluence.testspec:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sync_confluence"]
@@ -40,6 +45,7 @@ indent-style = "space"
 
 [dependency-groups]
 dev = [
+    "openpyxl>=3.1",
     "pytest>=7",
 ]
 

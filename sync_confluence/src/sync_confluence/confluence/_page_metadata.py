@@ -37,6 +37,8 @@ def _apply_page_metadata(
         )
     if request.managed_by_label:
         _apply_label(confluence, page_id, request.managed_by_label)
+    for label in request.labels:
+        _apply_label(confluence, page_id, label)
     if request.restrict_edits_to:
         _apply_edit_restriction(confluence, page_id, request.restrict_edits_to)
     if apply_page_width:
@@ -72,6 +74,12 @@ def _log_dry_run_metadata(request: PageUpsertRequest) -> None:
             "[DRY-RUN] Would label '%s' with '%s'",
             request.title,
             request.managed_by_label,
+        )
+    if request.labels:
+        log.debug(
+            "[DRY-RUN] Would label '%s' with %s",
+            request.title,
+            ", ".join(request.labels),
         )
     if request.restrict_edits_to:
         log.debug(

@@ -52,6 +52,13 @@ def run_testspec_sync(args: argparse.Namespace) -> int:
     auth = open_confluence_session(args, label_suffix=_LABEL_SUFFIX)
     if auth is None:
         return 1
+    if not auth.managed_by_label:
+        log.error(
+            "No managed-by label could be resolved (not in a Git checkout?); "
+            "pass --managed-by so existing folders can be checked for "
+            "ownership."
+        )
+        return 1
     try:
         sync_result = sync_test_cases(
             auth.confluence, cases, _sync_config(args, auth, suite)

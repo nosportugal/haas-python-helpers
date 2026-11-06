@@ -15,7 +15,10 @@ from sync_confluence.confluence._constants import PageSyncAction, _Keys
 from sync_confluence.confluence._errors import FolderConflictError
 from sync_confluence.confluence._folder_ownership import ensure_folder_owned
 from sync_confluence.confluence._logging import log
-from sync_confluence.confluence._lookup import _find_folder_by_space_cql
+from sync_confluence.confluence._lookup import (
+    _find_folder_by_space_cql,
+    find_folder_under_parent,
+)
 from sync_confluence.confluence._types import FolderUpsertRequest
 
 
@@ -71,3 +74,24 @@ def find_blocking_folder(
     if fallback_id is None:
         return None
     return _reuse_fallback_folder(confluence, request, fallback_id)
+
+
+def find_owned_folder(
+    confluence: Confluence, request: FolderUpsertRequest
+) -> Optional[str]:
+    """Return the id of the folder *request* would reuse, without changing it.
+
+    Read-only counterpart of :func:`upsert_folder` for dry runs: ``None`` when
+    no usable folder with that title exists; raises
+    :class:`FolderNotOwnedError` or :class:`FolderConflictError` like
+    ``upsert_folder`` would, including for a same-titled folder that sits
+    under another parent.
+    """
+    existing = find_folder_under_parent(
+        confluence, request.space_key, request.title, request.parent_id
+    )
+    if existing:
+        ensure_folder_owned(confluence, existing[_Keys.ID], request)
+        return existing[_Keys.ID]
+    blocking = find_blocking_folder(confluence, request)
+    return blocking[0] if blocking else None

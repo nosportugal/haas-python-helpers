@@ -20,10 +20,8 @@ from sync_confluence.confluence._attachments import upload_attachments
 from sync_confluence.confluence._cleanup import delete_orphans
 from sync_confluence.confluence._constants import DRY_RUN_PAGE_ID, PageSyncAction
 from sync_confluence.confluence._errors import FolderConflictError, FolderNotOwnedError
-from sync_confluence.confluence._folder_ownership import (
-    ensure_folder_owned,
-    find_owned_folder,
-)
+from sync_confluence.confluence._folder_fallback import find_owned_folder
+from sync_confluence.confluence._folder_ownership import ensure_folder_owned
 from sync_confluence.confluence._folder_upsert import upsert_folder
 from sync_confluence.confluence._lookup import (
     find_folder_under_parent,

@@ -14,6 +14,7 @@ from sync_confluence.confluence import (
     PageSyncAction,
     delete_orphans,
     ensure_folder_owned,
+    find_owned_folder,
     upsert_folder,
 )
 from sync_confluence.confluence._folder_create import _create_folder_with_fallback
@@ -207,12 +208,39 @@ def test_fallback_refuses_unlabelled_folder_under_the_parent(
         _create_folder_with_fallback(confluence, _owned_request())
 
 
-def test_ownership_is_not_checked_without_a_label() -> None:
+def test_ownership_fails_closed_without_a_label() -> None:
     confluence = MagicMock()
     request = FolderUpsertRequest(
         space_key="HaaS", parent_id="100", title="X", require_ownership=True
     )
 
-    ensure_folder_owned(confluence, "7", request)
+    with pytest.raises(FolderNotOwnedError, match="no managed-by label"):
+        ensure_folder_owned(confluence, "7", request)
 
     confluence.get.assert_not_called()
+
+
+def test_ownership_is_not_checked_when_not_required() -> None:
+    request = FolderUpsertRequest(space_key="HaaS", parent_id="100", title="X")
+
+    ensure_folder_owned(MagicMock(), "7", request)
+
+
+@patch(f"{_FOLDER_FALLBACK}._find_folder_by_space_cql", return_value="55")
+@patch(f"{_FOLDER_FALLBACK}.find_folder_under_parent", return_value=None)
+def test_find_owned_folder_rejects_same_title_under_another_parent(
+    mock_find: MagicMock, mock_cql: MagicMock
+) -> None:
+    confluence = MagicMock()
+    confluence.get.return_value = {"id": "55", "ancestors": [{"id": "999"}]}
+
+    with pytest.raises(FolderConflictError, match="not under parent 100"):
+        find_owned_folder(confluence, _owned_request())
+
+
+@patch(f"{_FOLDER_FALLBACK}._find_folder_by_space_cql", return_value=None)
+@patch(f"{_FOLDER_FALLBACK}.find_folder_under_parent", return_value=None)
+def test_find_owned_folder_returns_none_when_title_is_free(
+    mock_find: MagicMock, mock_cql: MagicMock
+) -> None:
+    assert find_owned_folder(MagicMock(), _owned_request()) is None

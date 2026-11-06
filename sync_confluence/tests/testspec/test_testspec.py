@@ -188,6 +188,14 @@ class TestReadWorkbook:
         assert f"'{sheet_name}' {reason}" in message
         assert "IDs: 1.1, 1.2" in message
 
+    def test_rejects_sheet_names_that_differ_only_by_case_or_spaces(
+        self, tmp_path: Path
+    ) -> None:
+        sheets = {**_valid_sheets(), " Index ": [INDEX_HEADERS]}
+
+        with pytest.raises(TestSpecError, match="same name"):
+            read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
+
     def test_lists_every_stray_sheet_in_one_error(self, tmp_path: Path) -> None:
         sheets = {**_valid_sheets(), "Notes": [["a"]], "7.7 - Inputs": [["a"]]}
 
@@ -591,7 +599,7 @@ class TestSyncTestCases:
         return_value=("DRY-RUN", "created"),
     )
     @patch(
-        "sync_confluence.confluence._folder_ownership.find_folder_under_parent",
+        "sync_confluence.confluence._folder_fallback.find_folder_under_parent",
         return_value=None,
     )
     def test_skipped_pages_are_reported_and_dry_run_skips_path_map(
@@ -612,17 +620,24 @@ class TestSyncTestCases:
     @patch("sync_confluence.testspec._sync.upsert_page", return_value=("7", "updated"))
     @patch("sync_confluence.testspec._sync.upsert_folder")
     @patch(
-        "sync_confluence.confluence._folder_ownership.find_folder_under_parent",
+        "sync_confluence.confluence._folder_ownership._page_has_label",
+        return_value=True,
+    )
+    @patch(
+        "sync_confluence.confluence._folder_fallback.find_folder_under_parent",
         return_value={"id": "f-suite"},
     )
     def test_dry_run_uses_existing_suite_folder_for_page_lookups(
         self,
         mock_find: MagicMock,
+        mock_has_label: MagicMock,
         mock_folder: MagicMock,
         mock_page: MagicMock,
         mock_path_map: MagicMock,
     ) -> None:
-        result = sync_test_cases(MagicMock(), [_case("1.1")], _config(dry_run=True))
+        config = _config(dry_run=True, managed_by_label="managed-by-repo-testspec")
+
+        result = sync_test_cases(MagicMock(), [_case("1.1")], config)
 
         mock_folder.assert_not_called()
         assert mock_find.call_args.args[2] == "L3VPN"
@@ -636,7 +651,7 @@ class TestSyncTestCases:
     )
     @patch("sync_confluence.testspec._sync.upsert_page")
     @patch(
-        "sync_confluence.confluence._folder_ownership.find_folder_under_parent",
+        "sync_confluence.confluence._folder_fallback.find_folder_under_parent",
         return_value={"id": "f-user"},
     )
     def test_dry_run_refuses_unowned_suite_folder(
@@ -715,6 +730,16 @@ def _run_args(workbook_path: Path) -> argparse.Namespace:
 
 
 class TestRunTestspecSync:
+    @patch("sync_confluence.testspec._cli.sync_test_cases")
+    @patch("sync_confluence.testspec._cli.open_confluence_session")
+    def test_refuses_to_publish_without_a_managed_by_label(
+        self, mock_auth: MagicMock, mock_sync: MagicMock, workbook_path: Path
+    ) -> None:
+        mock_auth.return_value.managed_by_label = None
+
+        assert run_testspec_sync(_run_args(workbook_path)) == 1
+        mock_sync.assert_not_called()
+
     @patch("sync_confluence.testspec._cli.finalise_sync_run")
     @patch("sync_confluence.testspec._cli.sync_test_cases")
     @patch("sync_confluence.testspec._cli.open_confluence_session")

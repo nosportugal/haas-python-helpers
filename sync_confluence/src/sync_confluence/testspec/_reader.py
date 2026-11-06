@@ -44,10 +44,24 @@ def _attach_sheets(case: TestCase, workbook: Workbook, sheets: dict[str, str]) -
     case.outputs = _optional_sheet(workbook, sheets, f"{case.test_id}{OUTPUTS_SUFFIX}")
 
 
+def _sheet_lookup(sheet_names: list[str]) -> dict[str, str]:
+    """Map normalised sheet name -> real name; reject names that collide."""
+    sheets: dict[str, str] = {}
+    for name in sheet_names:
+        key = name.strip().casefold()
+        if key in sheets:
+            raise TestSpecError(
+                f"Sheets '{sheets[key]}' and '{name}' have the same name "
+                "ignoring case and surrounding spaces; rename one of them."
+            )
+        sheets[key] = name
+    return sheets
+
+
 def read_workbook(path: Path) -> list[TestCase]:
     """Parse and validate *path*; raise :class:`TestSpecError` on layout errors."""
     workbook = openpyxl.load_workbook(path, data_only=True)
-    sheets = {name.strip().casefold(): name for name in workbook.sheetnames}
+    sheets = _sheet_lookup(workbook.sheetnames)
     cases = read_index(workbook, workbook.sheetnames[0])  # first sheet is the Index
     _check_unexpected_sheets(sheets, cases)
     for case in cases:

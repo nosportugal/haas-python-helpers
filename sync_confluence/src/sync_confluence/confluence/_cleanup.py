@@ -31,15 +31,16 @@ def _collect_children(confluence: Confluence, page_id: str) -> list[dict]:
 
 
 def _is_kept_by_path(
-    confluence: Confluence, orphan_id: str, expected_paths: Optional[set[str]]
+    source_path: Optional[str], request: DeleteOrphansRequest
 ) -> Optional[str]:
-    """Return source_path string if the page should be kept, else None."""
-    if expected_paths is None:
-        return None
-    source_path = _get_source_path_property(confluence, orphan_id)
-    if source_path is None or source_path not in expected_paths:
-        return None
-    return source_path
+    """Return why the page is kept based on its source path, else ``None``."""
+    prefix = request.source_path_prefix
+    if prefix is not None and not (source_path or "").startswith(prefix):
+        return f"source path {source_path!r} is outside cleanup scope {prefix!r}"
+    expected_paths = request.expected_paths
+    if expected_paths is not None and source_path in expected_paths:
+        return f"source path {source_path!r} still exists"
+    return None
 
 
 def _is_orphan_eligible(
@@ -50,14 +51,12 @@ def _is_orphan_eligible(
     orphan_id = page[_Keys.ID]
     if orphan_title in request.expected_titles:
         return False
-    kept_path = _is_kept_by_path(confluence, orphan_id, request.expected_paths)
-    if kept_path is not None:
-        log.debug(
-            "Keeping '%s' (id=%s) — source path '%s' still exists",
-            orphan_title,
-            orphan_id,
-            kept_path,
-        )
+    source_path = None
+    if request.expected_paths is not None or request.source_path_prefix is not None:
+        source_path = _get_source_path_property(confluence, orphan_id)
+    keep_reason = _is_kept_by_path(source_path, request)
+    if keep_reason is not None:
+        log.debug("Keeping '%s' (id=%s) — %s", orphan_title, orphan_id, keep_reason)
         return False
     if request.managed_by_label and not _page_has_label(
         confluence, orphan_id, request.managed_by_label
@@ -88,6 +87,8 @@ def delete_orphans(confluence: Confluence, request: DeleteOrphansRequest) -> int
     set, each candidate's ``sync_confluence_source_path`` page property is
     checked before deletion — a page whose stored source path is still in
     *expected_paths* is kept even if its title changed (rename detection).
+    When ``request.source_path_prefix`` is set, only pages whose source path
+    starts with it are eligible, so one sync never deletes another's pages.
     """
     all_pages = _collect_children(confluence, request.root_page_id)
     deleted = 0

@@ -164,7 +164,9 @@ Missing `Inputs`/`Outputs` sheets render as "Not specified yet."; sheets that ma
 An `Index` without test cases and `Inputs` rows with a blank `Parameter` also fail the run.
 The workbook is fully validated before any Confluence call.
 
-Each page is titled `<id> - <name> (<vendor>)` and contains Vendor, Type and Tags, the
+Confluence titles are unique per space, so titles carry a **suite** name (`--suite`, default: the
+workbook file name without extension). Vendor folders are titled `<vendor> (<suite>)`.
+Each page is titled `<id> - <name> (<vendor>, <suite>)` and contains Vendor, Type and Tags, the
 description, the Inputs table and the Outputs table (`CLI` and `JSON` cells as code
 macros). Vendor, type and tags are also applied as page labels.
 Labels are added, never removed, when tags change.
@@ -173,9 +175,17 @@ Labels are added, never removed, when tags change.
 `--page-width`, `--generated-by` and `--no-generated-by` options described above, plus:
 
 - `--xlsx` / `TESTSPEC_XLSX`: Path to the workbook — **required**
+- `--suite` / `TESTSPEC_SUITE`: Suite name used in titles and to scope cleanup (default: workbook file name without extension). Must not contain `/`
 
-Orphan cleanup works as for Markdown sync: managed pages and vendor folders under `--parent-id`
-that are no longer in the workbook are **permanently deleted**. In both commands cleanup is
+The default managed-by label is `managed-by-<repo>-testspec`, separate from the Markdown sync's
+`managed-by-<repo>`, so both commands can share a `--parent-id` without deleting each other's pages.
+An explicit `--managed-by` is used as given.
+
+Orphan cleanup only considers pages and vendor folders of the **same suite** (stored source path
+`testspec/<suite>/…`): those under `--parent-id` that are no longer in the workbook are
+**permanently deleted**, while other workbooks synced to the same parent are left alone.
+If a vendor folder title already exists elsewhere in the space, the run fails without cleanup
+instead of publishing under the other parent. In both commands cleanup is
 skipped for the whole run when any page was skipped (title collision), so a page that could not
 be moved is never deleted.
 

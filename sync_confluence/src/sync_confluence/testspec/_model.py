@@ -36,9 +36,24 @@ class TestCase:
     inputs: Optional[SheetTable] = None
     outputs: Optional[SheetTable] = None
 
-    @property
-    def title(self) -> str:
-        return f"{self.test_id} - {self.name} ({self.vendor})"
+    def page_title(self, suite: str) -> str:
+        """Space-unique page title; *suite* keeps workbooks from colliding."""
+        return f"{self.test_id} - {self.name} ({self.vendor}, {suite})"
+
+
+def vendor_folder_title(vendor: str, suite: str) -> str:
+    """Space-unique title of the folder holding one vendor's tests of *suite*."""
+    return f"{vendor} ({suite})"
+
+
+def suite_source_prefix(suite: str) -> str:
+    """Source-path prefix of every folder and page published for *suite*."""
+    return f"testspec/{suite}/"
+
+
+def vendor_source_path(vendor: str, suite: str) -> str:
+    """Source path of a vendor folder; its pages append ``/<test id>``."""
+    return f"{suite_source_prefix(suite)}{vendor}"
 
 
 @dataclass
@@ -50,6 +65,7 @@ class TestSpecSyncConfig:
     space_key: str
     parent_id: str
     source_file: Path
+    suite: str
     dry_run: bool = False
     managed_by_label: Optional[str] = None
     restrict_edits_to: Optional[str] = None

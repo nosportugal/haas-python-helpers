@@ -54,15 +54,22 @@ def managed_by_label_from_repo_url(repo_url: str) -> Optional[str]:
 
 
 def resolve_managed_by_label(
-    args: argparse.Namespace, repo_url: Optional[str]
+    args: argparse.Namespace, repo_url: Optional[str], label_suffix: str = ""
 ) -> Optional[str]:
-    """Resolve the managed-by Confluence label from explicit arg or repo URL."""
+    """Resolve the managed-by Confluence label from explicit arg or repo URL.
+
+    *label_suffix* is appended to the derived label only (e.g. ``-testspec``)
+    so that each front end owns its own pages by default; an explicit
+    ``--managed-by`` is used as given.
+    """
     if args.managed_by:
         managed_by: Optional[str] = args.managed_by
         log.info("Managed-by label: %s (explicit)", managed_by)
         return managed_by
     if repo_url:
         managed_by = managed_by_label_from_repo_url(repo_url)
+        if managed_by:
+            managed_by = f"{managed_by}{label_suffix}"
         log.info("Managed-by label: %s (derived from repository name)", managed_by)
         return managed_by
     log.warning(

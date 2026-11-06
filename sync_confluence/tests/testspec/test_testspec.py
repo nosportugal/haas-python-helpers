@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import datetime
 import json
 from pathlib import Path
@@ -9,8 +10,10 @@ import openpyxl
 import pytest
 from lxml import etree
 
+from sync_confluence.confluence import FolderConflictError
 from sync_confluence.confluence._page_metadata import _apply_page_metadata
 from sync_confluence.confluence._types import PageUpsertRequest
+from sync_confluence.confluence.sync_cli import new_sync_result
 from sync_confluence.testspec import (
     TestCase,
     TestSpecError,
@@ -21,6 +24,7 @@ from sync_confluence.testspec import (
     run_testspec_sync,
     sync_test_cases,
 )
+from sync_confluence.testspec._args import resolve_suite
 
 INDEX_HEADERS = ["Test ID", "Name", "Description", "Type", "Vendor", "Tags"]
 
@@ -78,7 +82,7 @@ class TestReadWorkbook:
     def test_reads_index_fields_and_title(self, workbook_path: Path) -> None:
         first, second = read_workbook(workbook_path)
 
-        assert first.title == "1.1 - Create leg (Cisco)"
+        assert first.page_title("L3VPN") == "1.1 - Create leg (Cisco, L3VPN)"
         assert first.test_type == "Create"
         assert first.tags == ["L3VPN", "Hub"]
         assert first.description == "Line one\nLine two"
@@ -304,31 +308,42 @@ class TestSyncTestCases:
         mock_page.return_value = ("p", "created")
         cases = [_case("1.10", "Cisco"), _case("1.2", "Cisco"), _case("1.1", "Nokia")]
         config = TestSpecSyncConfig(
-            space_key="HaaS", parent_id="100", source_file=Path("spec.xlsx")
+            space_key="HaaS",
+            parent_id="100",
+            source_file=Path("spec.xlsx"),
+            suite="L3VPN",
         )
 
         result = sync_test_cases(MagicMock(), cases, config)
 
         folders = [c.args[1] for c in mock_folder.call_args_list]
         assert [(f.title, f.parent_id) for f in folders] == [
-            ("Cisco", "100"),
-            ("Nokia", "100"),
+            ("Cisco (L3VPN)", "100"),
+            ("Nokia (L3VPN)", "100"),
         ]
         pages = [c.args[1] for c in mock_page.call_args_list]
         assert [(p.title, p.parent_id, p.source_path) for p in pages] == [
-            ("1.2 - Test 1.2 (Cisco)", "f-cisco", "testspec/Cisco/1.2"),
-            ("1.10 - Test 1.10 (Cisco)", "f-cisco", "testspec/Cisco/1.10"),
-            ("1.1 - Test 1.1 (Nokia)", "f-nokia", "testspec/Nokia/1.1"),
+            ("1.2 - Test 1.2 (Cisco, L3VPN)", "f-cisco", "testspec/L3VPN/Cisco/1.2"),
+            ("1.10 - Test 1.10 (Cisco, L3VPN)", "f-cisco", "testspec/L3VPN/Cisco/1.10"),
+            ("1.1 - Test 1.1 (Nokia, L3VPN)", "f-nokia", "testspec/L3VPN/Nokia/1.1"),
         ]
         assert pages[0].labels == ["cisco", "create"]
         assert result.stats["created"] == 3
         assert result.expected_titles == {
-            "Cisco",
-            "Nokia",
-            "1.2 - Test 1.2 (Cisco)",
-            "1.10 - Test 1.10 (Cisco)",
-            "1.1 - Test 1.1 (Nokia)",
+            "Cisco (L3VPN)",
+            "Nokia (L3VPN)",
+            "1.2 - Test 1.2 (Cisco, L3VPN)",
+            "1.10 - Test 1.10 (Cisco, L3VPN)",
+            "1.1 - Test 1.1 (Nokia, L3VPN)",
         }
+        assert result.expected_paths == {
+            "testspec/L3VPN/Cisco",
+            "testspec/L3VPN/Nokia",
+            "testspec/L3VPN/Cisco/1.2",
+            "testspec/L3VPN/Cisco/1.10",
+            "testspec/L3VPN/Nokia/1.1",
+        }
+        assert folders[0].source_path == "testspec/L3VPN/Cisco"
         assert [c.args[1] for c in mock_path_map.call_args_list] == [
             "f-cisco",
             "f-nokia",
@@ -352,14 +367,15 @@ class TestSyncTestCases:
             space_key="HaaS",
             parent_id="100",
             source_file=Path("spec.xlsx"),
+            suite="L3VPN",
             dry_run=True,
         )
 
         result = sync_test_cases(MagicMock(), [_case("1.1", "Cisco")], config)
 
-        assert result.skipped == ["1.1 - Test 1.1 (Cisco)"]
+        assert result.skipped == ["1.1 - Test 1.1 (Cisco, L3VPN)"]
         assert result.stats["skipped"] == 1
-        assert "1.1 - Test 1.1 (Cisco)" not in result.expected_titles
+        assert "1.1 - Test 1.1 (Cisco, L3VPN)" not in result.expected_titles
         mock_path_map.assert_not_called()
 
     @patch("sync_confluence.testspec._sync.build_source_path_map", return_value={})
@@ -380,12 +396,14 @@ class TestSyncTestCases:
             space_key="HaaS",
             parent_id="100",
             source_file=Path("spec.xlsx"),
+            suite="L3VPN",
             dry_run=True,
         )
 
         result = sync_test_cases(MagicMock(), [_case("1.1", "Cisco")], config)
 
         mock_folder.assert_not_called()
+        assert mock_find.call_args.args[2] == "Cisco (L3VPN)"
         assert mock_page.call_args.args[1].parent_id == "f-cisco"
         assert mock_path_map.call_args.args[1] == "f-cisco"
         assert result.stats["updated"] == 1
@@ -420,7 +438,78 @@ def test_run_fails_before_connecting_when_workbook_is_invalid(
     mock_auth: MagicMock, tmp_path: Path
 ) -> None:
     path = _write_workbook(tmp_path / "bad.xlsx", {"Sheet": [["x"]]})
-    args = MagicMock(xlsx=str(path))
+    args = MagicMock(xlsx=str(path), suite=None)
 
     assert run_testspec_sync(args) == 1
     mock_auth.assert_not_called()
+
+
+class TestResolveSuite:
+    def test_defaults_to_workbook_stem(self) -> None:
+        args = argparse.Namespace(suite=None, xlsx="dir/L3VPN - Cisco.xlsx")
+
+        assert resolve_suite(args) == "L3VPN - Cisco"
+
+    def test_explicit_suite_wins(self) -> None:
+        args = argparse.Namespace(suite=" L3VPN ", xlsx="spec.xlsx")
+
+        assert resolve_suite(args) == "L3VPN"
+
+    @pytest.mark.parametrize("suite", ["a/b", "   "])
+    def test_rejects_invalid_suite(self, suite: str) -> None:
+        args = argparse.Namespace(suite=suite, xlsx="spec.xlsx")
+
+        with pytest.raises(TestSpecError, match="Invalid suite name"):
+            resolve_suite(args)
+
+
+def _run_args(workbook_path: Path) -> argparse.Namespace:
+    return argparse.Namespace(
+        xlsx=str(workbook_path),
+        suite="L3VPN",
+        space="HaaS",
+        parent_id="100",
+        dry_run=False,
+        page_width=None,
+        generated_by=None,
+        no_generated_by=False,
+    )
+
+
+class TestRunTestspecSync:
+    @patch("sync_confluence.testspec._cli.finalise_sync_run")
+    @patch("sync_confluence.testspec._cli.sync_test_cases")
+    @patch("sync_confluence.testspec._cli.open_confluence_session")
+    def test_uses_testspec_label_and_suite_scoped_cleanup(
+        self,
+        mock_auth: MagicMock,
+        mock_sync: MagicMock,
+        mock_finalise: MagicMock,
+        workbook_path: Path,
+    ) -> None:
+        mock_sync.return_value = new_sync_result()
+
+        assert run_testspec_sync(_run_args(workbook_path)) == 0
+
+        assert mock_auth.call_args.kwargs == {"label_suffix": "-testspec"}
+        assert mock_sync.call_args.args[2].suite == "L3VPN"
+        assert mock_finalise.call_args.kwargs == {
+            "source_path_prefix": "testspec/L3VPN/"
+        }
+
+    @patch("sync_confluence.testspec._cli.finalise_sync_run")
+    @patch(
+        "sync_confluence.testspec._cli.sync_test_cases",
+        side_effect=FolderConflictError("Folder 'Cisco (L3VPN)' already exists."),
+    )
+    @patch("sync_confluence.testspec._cli.open_confluence_session")
+    def test_folder_conflict_fails_without_cleanup(
+        self,
+        mock_auth: MagicMock,
+        mock_sync: MagicMock,
+        mock_finalise: MagicMock,
+        workbook_path: Path,
+    ) -> None:
+        assert run_testspec_sync(_run_args(workbook_path)) == 1
+
+        mock_finalise.assert_not_called()

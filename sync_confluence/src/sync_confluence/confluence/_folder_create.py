@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from atlassian import Confluence
 
 from sync_confluence.confluence._constants import (
@@ -12,8 +10,8 @@ from sync_confluence.confluence._constants import (
     PageSyncAction,
     _Keys,
 )
+from sync_confluence.confluence._folder_fallback import find_blocking_folder
 from sync_confluence.confluence._logging import log
-from sync_confluence.confluence._lookup import _find_folder_by_space_cql
 from sync_confluence.confluence._properties import _apply_label, _try_property_set
 from sync_confluence.confluence._types import FolderUpsertRequest
 
@@ -64,16 +62,6 @@ def _is_folder_exists_error(exc) -> bool:
     )
 
 
-def _lookup_existing_folder_via_cql(
-    confluence: Confluence, request: FolderUpsertRequest
-) -> Optional[str]:
-    try:
-        return _find_folder_by_space_cql(confluence, request.space_key, request.title)
-    except Exception as cql_exc:
-        log.debug("CQL fallback also failed: %s", cql_exc)
-        return None
-
-
 def _create_folder_with_fallback(
     confluence: Confluence, request: FolderUpsertRequest
 ) -> tuple[str, str]:
@@ -89,14 +77,9 @@ def _create_folder_with_fallback(
             request.title,
             exc,
         )
-        fallback_id = _lookup_existing_folder_via_cql(confluence, request)
-        if fallback_id:
-            log.info(
-                "Found existing folder '%s' via CQL (id=%s)",
-                request.title,
-                fallback_id,
-            )
-            return (fallback_id, PageSyncAction.UNCHANGED)
+        blocking_folder = find_blocking_folder(confluence, request)
+        if blocking_folder:
+            return blocking_folder
         raise
     log.info("Created folder: '%s' (id=%s)", request.title, folder_id)
     _post_create_folder_setup(confluence, folder_id, request)

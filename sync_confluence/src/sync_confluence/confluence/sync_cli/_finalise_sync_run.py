@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 from sync_confluence.confluence import (
     DRY_RUN_PAGE_ID,
@@ -20,6 +21,7 @@ def _run_orphan_cleanup(
     parent_id: str,
     sync_result: SyncResult,
     dry_run: bool,
+    source_path_prefix: Optional[str],
 ) -> int:
     if parent_id == DRY_RUN_PAGE_ID:
         log.info("[DRY-RUN] Skipping orphan check — parent page does not exist yet")
@@ -40,6 +42,7 @@ def _run_orphan_cleanup(
         dry_run=dry_run,
         managed_by_label=session.managed_by_label,
         expected_paths=sync_result.expected_paths,
+        source_path_prefix=source_path_prefix,
     )
     return delete_orphans(session.confluence, request)
 
@@ -68,7 +71,14 @@ def finalise_sync_run(
     session: ConfluenceSession,
     parent_id: str,
     dry_run: bool,
+    source_path_prefix: Optional[str] = None,
 ) -> None:
-    """Run orphan cleanup under *parent_id*, then log the sync run summary."""
-    deleted = _run_orphan_cleanup(session, parent_id, sync_result, dry_run)
+    """Run orphan cleanup under *parent_id*, then log the sync run summary.
+
+    *source_path_prefix* limits cleanup to pages whose stored source path
+    starts with it (see :class:`DeleteOrphansRequest`).
+    """
+    deleted = _run_orphan_cleanup(
+        session, parent_id, sync_result, dry_run, source_path_prefix
+    )
     _log_sync_summary(sync_result, deleted)

@@ -11,11 +11,13 @@ single-module layout):
 - :data:`DRY_RUN_PAGE_ID`, :class:`PageSyncAction` — dry-run placeholder page id
   and upsert action values.
 - :func:`find_page_under_parent`, :func:`find_folder_under_parent` — lookups.
+- :class:`FolderConflictError` — a same-titled folder exists but cannot be used.
 """
 
 from sync_confluence.confluence._attachments import upload_attachments
 from sync_confluence.confluence._cleanup import delete_orphans
 from sync_confluence.confluence._constants import DRY_RUN_PAGE_ID, PageSyncAction
+from sync_confluence.confluence._errors import FolderConflictError
 from sync_confluence.confluence._folder_upsert import upsert_folder
 from sync_confluence.confluence._lookup import (
     find_folder_under_parent,
@@ -32,6 +34,7 @@ from sync_confluence.confluence._types import (
 __all__ = [
     "DRY_RUN_PAGE_ID",
     "DeleteOrphansRequest",
+    "FolderConflictError",
     "FolderUpsertRequest",
     "PageSyncAction",
     "PageUpsertRequest",

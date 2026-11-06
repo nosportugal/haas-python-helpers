@@ -54,8 +54,13 @@ def _resolve_restrict_edits_to(
     return account_id
 
 
-def open_confluence_session(args: argparse.Namespace) -> Optional[ConfluenceSession]:
-    """Open a Confluence session: detect repo URL, derive label, connect, auth."""
+def open_confluence_session(
+    args: argparse.Namespace, label_suffix: str = ""
+) -> Optional[ConfluenceSession]:
+    """Open a Confluence session: detect repo URL, derive label, connect, auth.
+
+    *label_suffix* is passed to :func:`resolve_managed_by_label`.
+    """
     repo_url = detect_repo_url()
     if not repo_url:
         log.warning(
@@ -64,7 +69,7 @@ def open_confluence_session(args: argparse.Namespace) -> Optional[ConfluenceSess
             "Relative links will not be rewritten and managed-by label "
             "cannot be auto-derived."
         )
-    managed_by_label = resolve_managed_by_label(args, repo_url)
+    managed_by_label = resolve_managed_by_label(args, repo_url, label_suffix)
     confluence = _connect_confluence(args)
     restrict_edits_to = _resolve_restrict_edits_to(confluence, args)
     if restrict_edits_to is None:

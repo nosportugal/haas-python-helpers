@@ -10,7 +10,7 @@ from sync_confluence.testspec._index_columns import IndexColumns, find_index_col
 from sync_confluence.testspec._model import TestCase, TestSpecError
 from sync_confluence.testspec._sheets import read_sheet
 
-_TEST_ID_RE = re.compile(r"^\d+\.\d+$")
+_TEST_ID_RE = re.compile(r"^\d+(\.\d+)*$")
 _TAG_SPLIT_RE = re.compile(r"[;,\n]")
 _ID = "ID"
 _NAME = "Name"
@@ -41,7 +41,9 @@ def _parse_index_row(row: list[str], columns: IndexColumns) -> TestCase:
     mandatory = columns.mandatory
     test_id = row[mandatory[_ID]].strip()
     if not _TEST_ID_RE.match(test_id):
-        raise TestSpecError(f"Index: ID '{test_id}' is not in the n.n format")
+        raise TestSpecError(
+            f"Index: ID '{test_id}' must be dot-separated numbers, e.g. 1, 1.1 or 1.1.3"
+        )
     name = row[mandatory[_NAME]].strip()
     if not name:
         raise TestSpecError(f"Index: test {test_id} needs a Name")

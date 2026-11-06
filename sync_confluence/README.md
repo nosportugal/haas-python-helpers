@@ -160,12 +160,13 @@ A ready-made example that follows this format is in
 The format is the same for any kind of test (unit, integration, E2E, ...). Headers are
 matched case-insensitively; the first non-empty row of each sheet is the header row.
 
-| Sheet                   | Required | Content                                                                                                  |
-| ----------------------- | -------- | -------------------------------------------------------------------------------------------------------- |
-| **First sheet**         | yes      | The **Index**: one row per test case. Its name is not significant                                        |
-| `Parameters`            | no       | `Parameter` plus any catalog columns (type, default, ...). Every parameter is listed on every test page  |
-| `<ID> - Inputs`         | no       | `Parameter`, `Value`, plus any extra columns. Parameters must exist in `Parameters` when it is present   |
-| `<ID> - Outputs`        | no       | `JSON`, plus any extra columns (e.g. `CLI`). One row per expected JSON document; `JSON` must be valid    |
+| Sheet            | Required | Content                                                                                                  |
+| ---------------- | -------- | -------------------------------------------------------------------------------------------------------- |
+| **First sheet**  | yes      | The **Index**: one row per test case. Its name is not significant                                        |
+| `<ID> - Inputs`  | no       | A table with any columns. Shown as-is on the page of the test with that `ID`                             |
+| `<ID> - Outputs` | no       | A table that must have a `JSON` column, plus any other columns (e.g. `CLI`). `JSON` cells must be valid  |
+
+No other sheet is allowed (see [Rejected sheets](#rejected-sheets)).
 
 #### Index sheet
 
@@ -174,7 +175,7 @@ columns**; a missing one fails the run:
 
 | Column        | Meaning                                                                                                      |
 | ------------- | ------------------------------------------------------------------------------------------------------------ |
-| `ID`          | Test identifier in `n.n` form (`1.1`, `2.10`), unique in the workbook. Format the column as **Text** so `1.10` is not read as `1.1` |
+| `ID`          | Test identifier: dot-separated numbers with **any number of levels** (`1`, `1.1`, `1.1.3`), unique in the workbook. Format the column as **Text** so `1.10` is not read as `1.1`. Tests are ordered numerically, level by level |
 | `Name`        | Short test name (required on every row)                                                                      |
 | `Description` | What the test checks; may be empty on a row. A blank line starts a new paragraph                             |
 | `Tags`        | Free-form tags separated by `;` or `,`; may be empty on a row. Tags are also applied as page labels         |
@@ -198,9 +199,22 @@ Outputs
 
 `Tags` is always the first field, then the additional columns in the order they appear in
 the Index table, then `Description`, `Inputs` and `Outputs`. Fields with no value show `-`.
-Missing `Inputs`/`Outputs` sheets render as "Not specified yet."; sheets that match no `ID`
-fail the run. An Index without test cases and `Inputs` rows with a blank `Parameter` also
-fail the run. The workbook is fully validated before any Confluence call.
+Missing `Inputs`/`Outputs` sheets render as "Not specified yet.". An Index without test cases
+also fails the run. The workbook is fully validated before any Confluence call.
+
+#### Rejected sheets
+
+A sheet other than the Index, `<ID> - Inputs` and `<ID> - Outputs` fails the run, so a
+mistyped name can never silently drop its content. `<ID>` must be listed in the Index; the
+match ignores case and surrounding spaces. The error names each sheet and says why:
+
+| Sheet name       | Reason reported                                                    |
+| ---------------- | ------------------------------------------------------------------ |
+| `1.1.3 - Inputs` | refers to ID `1.1.3`, which is not in the Index                    |
+| `1.1- Inputs`    | must be named exactly `1.1 - Inputs`                               |
+| `Notes`          | is neither the Index (first sheet) nor named `<ID> - Inputs`/`Outputs` |
+
+The message always ends with the list of IDs found in the Index.
 
 ### Titles, folders and cleanup
 

@@ -25,6 +25,7 @@ from sync_confluence.testspec import (
     sync_test_cases,
 )
 from sync_confluence.testspec._args import resolve_suite
+from sync_confluence.testspec._sync import _sort_key
 
 # Mandatory columns (ID, Name, Description, Tags) plus two additional ones.
 INDEX_HEADERS = ["ID", "Name", "Vendor", "Description", "Tags", "Priority"]
@@ -51,12 +52,11 @@ def _valid_sheets() -> dict[str, list[list]]:
             ["1.1", "Create leg", "Cisco", "Line one\nLine two", "L3VPN; Hub", "High"],
             ["1.2", "Delete leg", "Nokia", "", "", ""],
         ],
-        "Parameters": [
-            ["Parameter", "Type", "Default"],
-            ["vrfName", "string", ""],
-            ["mtu", "integer", 1500],
+        "1.1 - Inputs": [
+            ["Characteristic", "Type", "Value"],
+            ["mtu", "integer", 9000],
+            ["vrfName", "string", "A"],
         ],
-        "1.1 - Inputs": [["Parameter", "Value", "Notes"], ["mtu", 9000, "bytes"]],
         "1.1 - Outputs": [
             ["Target", "CLI", "JSON"],
             ["/vrfs", "vrf A\n address-family ipv4", '{"vrf-name":"A"}'],
@@ -88,29 +88,29 @@ class TestReadWorkbook:
     def test_example_workbook_follows_the_format(self) -> None:
         cases = read_workbook(_EXAMPLE)
 
-        assert [case.test_id for case in cases] == ["1.1", "1.2", "2.1", "2.2"]
+        assert [case.test_id for case in cases] == [
+            "1.1",
+            "1.2",
+            "2.1",
+            "2.2",
+            "1.1.3",
+        ]
         assert [header for header, _ in cases[0].extra_fields] == [
             "Type",
             "Component",
             "Priority",
         ]
 
-    def test_joins_all_catalog_parameters_with_values(
+    def test_inputs_are_a_plain_table_with_any_columns(
         self, workbook_path: Path
     ) -> None:
         first, _ = read_workbook(workbook_path)
 
         assert first.inputs is not None
-        assert first.inputs.headers == [
-            "Parameter",
-            "Type",
-            "Default",
-            "Value",
-            "Notes",
-        ]
+        assert first.inputs.headers == ["Characteristic", "Type", "Value"]
         assert first.inputs.rows == [
-            ["vrfName", "string", "", "", ""],
-            ["mtu", "integer", "1500", "9000", "bytes"],
+            ["mtu", "integer", "9000"],
+            ["vrfName", "string", "A"],
         ]
 
     def test_pretty_prints_json_outputs(self, workbook_path: Path) -> None:
@@ -128,7 +128,7 @@ class TestReadWorkbook:
     @pytest.mark.parametrize(
         ("index_row", "message"),
         [
-            (["1.x", "Name", "Cisco", "", "", ""], "n.n format"),
+            (["1.x", "Name", "Cisco", "", "", ""], "dot-separated numbers"),
             (["1.1", "", "Cisco", "", "", ""], "needs a Name"),
             ([1.1, "Name", "Cisco", "", "", ""], "format the ID column"),
         ],
@@ -145,19 +145,81 @@ class TestReadWorkbook:
         with pytest.raises(TestSpecError, match="duplicate ID 1.1"):
             _read_with(tmp_path, Index=[INDEX_HEADERS, row, row])
 
-    def test_rejects_sheets_without_matching_test(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize(
+        ("sheet_name", "reason"),
+        [
+            ("1.1.3 - Inputs", "refers to ID '1.1.3', which is not in the Index"),
+            ("9.9 - Outputs", "refers to ID '9.9', which is not in the Index"),
+            ("1.1- Inputs", "must be named exactly '1.1 - Inputs'"),
+            ("1.1 -Outputs", "must be named exactly '1.1 - Outputs'"),
+            ("Notes", "is neither the Index (first sheet) nor named"),
+            ("Parameters", "is neither the Index (first sheet) nor named"),
+        ],
+    )
+    def test_rejects_stray_sheets_with_the_reason(
+        self, tmp_path: Path, sheet_name: str, reason: str
+    ) -> None:
         sheets = _valid_sheets()
-        sheets["1.1- Inputs"] = [["Parameter", "Value"]]
+        sheets[sheet_name] = [["Name", "Value"], ["mtu", 1]]
 
-        with pytest.raises(TestSpecError, match="1.1- Inputs"):
+        with pytest.raises(TestSpecError) as exc_info:
             read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
 
-    def test_rejects_inputs_not_in_catalog(self, tmp_path: Path) -> None:
-        sheets = _valid_sheets()
-        sheets["1.1 - Inputs"] = [["Parameter", "Value"], ["mtuu", 1]]
+        message = str(exc_info.value)
+        assert f"'{sheet_name}' {reason}" in message
+        assert "IDs: 1.1, 1.2" in message
 
-        with pytest.raises(TestSpecError, match="not in the Parameters sheet: mtuu"):
+    def test_lists_every_stray_sheet_in_one_error(self, tmp_path: Path) -> None:
+        sheets = {**_valid_sheets(), "Notes": [["a"]], "7.7 - Inputs": [["a"]]}
+
+        with pytest.raises(TestSpecError) as exc_info:
             read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
+
+        assert "'Notes'" in str(exc_info.value)
+        assert "'7.7 - Inputs'" in str(exc_info.value)
+
+    def test_per_test_sheet_names_ignore_case_and_outer_spaces(
+        self, tmp_path: Path
+    ) -> None:
+        sheets = _valid_sheets()
+        sheets["1.2 - INPUTS "] = [["Name"], ["x"]]
+
+        _, second = read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
+
+        assert second.inputs is not None
+
+    @pytest.mark.parametrize("test_id", ["1", "1.1", "1.1.3", "2.10.4.7"])
+    def test_accepts_ids_of_any_depth(self, tmp_path: Path, test_id: str) -> None:
+        index = [INDEX_HEADERS, [test_id, "Leg", "Cisco", "", "", ""]]
+
+        (case,) = read_workbook(_write_workbook(tmp_path / "s.xlsx", {"Index": index}))
+
+        assert case.test_id == test_id
+
+    def test_deep_ids_attach_their_own_sheets(self, tmp_path: Path) -> None:
+        sheets = {
+            "Index": [INDEX_HEADERS, ["1.1.3", "Leg", "Cisco", "", "", ""]],
+            "1.1.3 - Inputs": [["Name", "Value"], ["mtu", 1]],
+        }
+
+        (case,) = read_workbook(_write_workbook(tmp_path / "s.xlsx", sheets))
+
+        assert case.inputs is not None
+        assert case.inputs.rows == [["mtu", "1"]]
+
+    @pytest.mark.parametrize("test_id", ["", "1.", ".1", "1..2", "1.x", "v1.2"])
+    def test_rejects_malformed_ids(self, tmp_path: Path, test_id: str) -> None:
+        index = [INDEX_HEADERS, [test_id, "Leg", "Cisco", "", "", ""]]
+
+        with pytest.raises(TestSpecError, match="dot-separated numbers"):
+            read_workbook(_write_workbook(tmp_path / "s.xlsx", {"Index": index}))
+
+    def test_deep_ids_sort_numerically(self) -> None:
+        ids = ["1.10", "1.2", "1.1.3", "1.1", "1"]
+
+        ordered = sorted(ids, key=lambda i: _sort_key(_case(i)))
+
+        assert ordered == ["1", "1.1", "1.1.3", "1.2", "1.10"]
 
     def test_rejects_invalid_json(self, tmp_path: Path) -> None:
         sheets = _valid_sheets()
@@ -166,17 +228,12 @@ class TestReadWorkbook:
         with pytest.raises(TestSpecError, match="data row 1: invalid JSON"):
             read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
 
-    def test_accepts_json_only_outputs_without_parameters_sheet(
-        self, tmp_path: Path
-    ) -> None:
+    def test_accepts_json_only_outputs(self, tmp_path: Path) -> None:
         sheets = _valid_sheets()
-        del sheets["Parameters"]
         sheets["1.1 - Outputs"] = [["JSON"], ['{"mtu": 9000}']]
 
         first, _ = read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
 
-        assert first.inputs is not None
-        assert first.inputs.rows == [["mtu", "9000", "bytes"]]
         assert first.outputs is not None
         assert first.outputs.headers == ["JSON"]
         assert first.outputs.rows == [[json.dumps({"mtu": 9000}, indent=2)]]
@@ -251,13 +308,6 @@ class TestReadWorkbook:
         with pytest.raises(TestSpecError, match="'Index' has no test cases"):
             read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
 
-    def test_rejects_blank_parameter_name(self, tmp_path: Path) -> None:
-        sheets = _valid_sheets()
-        sheets["1.1 - Inputs"] = [["Parameter", "Value"], ["mtu", 1], [None, 9000]]
-
-        with pytest.raises(TestSpecError, match="data row 2: blank Parameter name"):
-            read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
-
     @pytest.mark.parametrize(
         ("cell_value", "expected"),
         [
@@ -269,12 +319,12 @@ class TestReadWorkbook:
         self, tmp_path: Path, cell_value: datetime.datetime, expected: str
     ) -> None:
         sheets = _valid_sheets()
-        sheets["1.1 - Inputs"] = [["Parameter", "Value"], ["mtu", cell_value]]
+        sheets["1.1 - Inputs"] = [["Name", "Value"], ["mtu", cell_value]]
 
         first, _ = read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
 
         assert first.inputs is not None
-        assert first.inputs.rows[1][-1] == expected
+        assert first.inputs.rows[0][-1] == expected
 
 
 class TestRenderTestCase:

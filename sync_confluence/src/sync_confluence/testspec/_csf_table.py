@@ -8,8 +8,8 @@ from typing import Optional
 from lxml import etree
 
 from sync_confluence.confluence.storage_format import ElementType, build_code_macro
-from sync_confluence.testspec._join import CLI_COLUMN, JSON_COLUMN
 from sync_confluence.testspec._model import SheetTable
+from sync_confluence.testspec._outputs import CLI_COLUMN, JSON_COLUMN
 
 _NOT_SPECIFIED = "Not specified yet."
 _CODE_LANGUAGES = MappingProxyType(

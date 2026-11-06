@@ -149,11 +149,11 @@ the `xlsx` extra:
 ```bash
 pip install "sync-confluence[xlsx] @ git+https://github.com/nosportugal/haas-python-helpers.git#subdirectory=sync_confluence"
 
-sync-confluence-testspec --xlsx testspec.xlsx --space HaaS --parent-id 12345 --dry-run
+sync-confluence-testspec --xlsx HAAS-L3VPN-CISCO__l3vpn_tests.xlsx --space HaaS --parent-id 12345 --dry-run
 ```
 
 A ready-made example that follows this format is in
-[`examples/testspec_format_example.xlsx`](examples/testspec_format_example.xlsx).
+[`examples/DEMO-EXAMPLE__format_example.xlsx`](examples/DEMO-EXAMPLE__format_example.xlsx).
 
 ### Workbook format
 
@@ -234,11 +234,59 @@ match ignores case and surrounding spaces. The error names each sheet and says w
 
 The message always ends with the list of IDs found in the Index.
 
+### Workbook file name
+
+The file name carries the **suite ID**, the identifier that keeps the pages of different
+workbooks apart in a Confluence space. It is checked before any Confluence call.
+
+```text
+<ID>[__<description>].xlsx
+
+<FOO>-<BAR>_<QUX>__<corge>_<garply>.xlsx
+ |     |    |      └─ description: free text, ignored by the tool
+ |     |    └──────── more words of the same segment, joined with _
+ |     └───────────── segment
+ └─────────────────── project (the owning team's Jira project key)
+```
+
+| Part          | Rule                                                                                           |
+| ------------- | ---------------------------------------------------------------------------------------------- |
+| `ID`          | `PROJECT-SEGMENT` plus up to two more `-SEGMENT`s; at most 24 characters                       |
+| `PROJECT`     | 2 to 10 characters: uppercase ASCII letters and digits, starting with a letter                 |
+| `SEGMENT`     | Uppercase ASCII letters and digits; `_` joins words inside a segment (`ROUTING_CORE`)          |
+| `__`          | Two underscores end the ID. A single `_` never does                                            |
+| `description` | Optional. ASCII letters, digits, `.`, `_`, `-`, starting with a letter or digit. Never used    |
+
+No spaces and no non-ASCII characters are allowed anywhere in the file name; `_` is the word
+separator. The ID must be uppercase, because file systems and Confluence may treat names that
+differ only by case as the same.
+
+| File name                                    | Suite ID                |
+| -------------------------------------------- | ----------------------- |
+| `HAAS-493__routing_acceptance.xlsx`          | `HAAS-493`              |
+| `HAAS-ROUTING_CORE-E2E__end_to_end_v2.xlsx`  | `HAAS-ROUTING_CORE-E2E` |
+| `HAAS-L3VPN-CISCO.xlsx`                      | `HAAS-L3VPN-CISCO`      |
+
+A name that breaks the rule fails the run and the error says why, for example
+`Testes serviço L3VPN - Cisco.xlsx` ("must not contain spaces") or `HAAS-493_routing.xlsx`
+("Did you mean `HAAS-493__routing`?").
+
+**Two workbooks with the same ID are the same suite.** Syncing one updates the pages of the
+other and cleanup deletes the pages that are no longer in the file. The description is free, so
+`HAAS-L3VPN-CISCO__v1.xlsx` and `HAAS-L3VPN-CISCO__v2.xlsx` are two versions of one suite; the
+last one synced wins. Keep **one workbook per variant** (vendor, environment, platform, ...)
+and put the variant in the ID: `HAAS-L3VPN-CISCO` and `HAAS-L3VPN-NOKIA` are different suites,
+whereas `HAAS-L3VPN__cisco.xlsx` and `HAAS-L3VPN__nokia.xlsx` are the same one. The tool only
+checks the format, so keeping IDs unique across teams is a convention to agree on; using the
+team's Jira project key as the first part keeps teams apart.
+
 ### Titles, folders and cleanup
 
-Confluence titles are unique per space, so titles carry a **suite** name (`--suite`, default:
-the workbook file name without extension; a naming rule for workbook files is still to be
-defined). The suite folder is titled `<suite>` and each page `<ID> - <Name> (<suite>)`.
+Confluence titles are unique per space, so titles carry the **suite ID** (from the
+[file name](#workbook-file-name) or `--suite`). The suite folder is titled `<suite>` and each
+page `<ID> - <Name> (<suite>)`, for example `HAAS-L3VPN-CISCO` and
+`1.1 - Create L3VPN Leg (HAAS-L3VPN-CISCO)`. A page title longer than Confluence's 255
+characters fails the run, naming the tests whose `Name` must be shortened.
 Labels are added, never removed, when tags change.
 
 `sync-confluence-testspec` accepts the connection, `--dry-run`, `--managed-by`, `--log-level`,
@@ -246,7 +294,7 @@ Labels are added, never removed, when tags change.
 
 - `--xlsx` / `TESTSPEC_XLSX`: Path to the workbook — **required**
 - `--format-json` / `TESTSPEC_FORMAT_JSON`: Pretty-print valid JSON in `JSON` columns (default: off, text shown as written)
-- `--suite` / `TESTSPEC_SUITE`: Suite name used in titles and to scope cleanup (default: workbook file name without extension). Must not contain `/`
+- `--suite` / `TESTSPEC_SUITE`: Suite ID used in titles and to scope cleanup (default: the ID at the start of the workbook file name). It is only an ID, without `__<description>`, and follows the same rules as in the file name
 
 The default managed-by label is `managed-by-<repo>-testspec`, separate from the Markdown sync's
 `managed-by-<repo>`, so both commands can share a `--parent-id` without deleting each other's pages.

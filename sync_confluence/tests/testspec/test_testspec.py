@@ -25,7 +25,6 @@ from sync_confluence.testspec import (
     run_testspec_sync,
     sync_test_cases,
 )
-from sync_confluence.testspec._args import resolve_suite
 from sync_confluence.testspec._sync import _sort_key
 
 _MACRO = "{http://atlassian.com/content}structured-macro"
@@ -33,7 +32,9 @@ _MACRO = "{http://atlassian.com/content}structured-macro"
 # Mandatory columns (ID, Name, Description, Tags) plus two additional ones.
 INDEX_HEADERS = ["ID", "Name", "Vendor", "Description", "Tags", "Priority"]
 _EXAMPLE = (
-    Path(__file__).resolve().parents[2] / "examples" / "testspec_format_example.xlsx"
+    Path(__file__).resolve().parents[2]
+    / "examples"
+    / "DEMO-EXAMPLE__format_example.xlsx"
 )
 
 
@@ -692,36 +693,17 @@ def test_page_metadata_applies_extra_labels(
 def test_run_fails_before_connecting_when_workbook_is_invalid(
     mock_auth: MagicMock, tmp_path: Path
 ) -> None:
-    path = _write_workbook(tmp_path / "bad.xlsx", {"Sheet": [["x"]]})
+    path = _write_workbook(tmp_path / "HAAS-BAD__bad.xlsx", {"Sheet": [["x"]]})
     args = MagicMock(xlsx=str(path), suite=None)
 
     assert run_testspec_sync(args) == 1
     mock_auth.assert_not_called()
 
 
-class TestResolveSuite:
-    def test_defaults_to_workbook_stem(self) -> None:
-        args = argparse.Namespace(suite=None, xlsx="dir/L3VPN - Cisco.xlsx")
-
-        assert resolve_suite(args) == "L3VPN - Cisco"
-
-    def test_explicit_suite_wins(self) -> None:
-        args = argparse.Namespace(suite=" L3VPN ", xlsx="spec.xlsx")
-
-        assert resolve_suite(args) == "L3VPN"
-
-    @pytest.mark.parametrize("suite", ["a/b", "   "])
-    def test_rejects_invalid_suite(self, suite: str) -> None:
-        args = argparse.Namespace(suite=suite, xlsx="spec.xlsx")
-
-        with pytest.raises(TestSpecError, match="Invalid suite name"):
-            resolve_suite(args)
-
-
 def _run_args(workbook_path: Path) -> argparse.Namespace:
     return argparse.Namespace(
         xlsx=str(workbook_path),
-        suite="L3VPN",
+        suite="HAAS-L3VPN",
         space="HaaS",
         parent_id="100",
         dry_run=False,
@@ -748,9 +730,9 @@ class TestRunTestspecSync:
         assert run_testspec_sync(_run_args(workbook_path)) == 0
 
         assert mock_auth.call_args.kwargs == {"label_suffix": "-testspec"}
-        assert mock_sync.call_args.args[2].suite == "L3VPN"
+        assert mock_sync.call_args.args[2].suite == "HAAS-L3VPN"
         assert mock_finalise.call_args.kwargs == {
-            "source_path_prefix": "testspec/L3VPN/"
+            "source_path_prefix": "testspec/HAAS-L3VPN/"
         }
 
     @patch("sync_confluence.testspec._cli.finalise_sync_run")

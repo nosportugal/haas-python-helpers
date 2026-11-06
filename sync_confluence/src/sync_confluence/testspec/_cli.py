@@ -6,7 +6,6 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import NamedTuple, Optional
 
 from sync_confluence.confluence import FolderConflictError
 from sync_confluence.confluence.sync_cli import (
@@ -14,18 +13,9 @@ from sync_confluence.confluence.sync_cli import (
     finalise_sync_run,
     open_confluence_session,
 )
-from sync_confluence.testspec._args import (
-    missing_required,
-    parse_testspec_sync_args,
-    resolve_suite,
-)
-from sync_confluence.testspec._model import (
-    TestCase,
-    TestSpecError,
-    TestSpecSyncConfig,
-    suite_source_prefix,
-)
-from sync_confluence.testspec._reader import read_workbook
+from sync_confluence.testspec._args import missing_required, parse_testspec_sync_args
+from sync_confluence.testspec._input import read_input
+from sync_confluence.testspec._model import TestSpecSyncConfig, suite_source_prefix
 from sync_confluence.testspec._sync import sync_test_cases
 
 log = logging.getLogger(__name__)
@@ -53,32 +43,9 @@ def _sync_config(
     )
 
 
-class _WorkbookInput(NamedTuple):
-    suite: str
-    cases: list[TestCase]
-
-
-def _read_input(args: argparse.Namespace) -> Optional[_WorkbookInput]:
-    """Return the suite and test cases, or ``None`` after logging why not."""
-    try:
-        workbook_input = _WorkbookInput(
-            resolve_suite(args), read_workbook(Path(args.xlsx))
-        )
-    except (OSError, TestSpecError) as exc:
-        log.error("Cannot read %s: %s", args.xlsx, exc)
-        return None
-    log.info(
-        "Read %d test case(s) of suite '%s' from %s",
-        len(workbook_input.cases),
-        workbook_input.suite,
-        args.xlsx,
-    )
-    return workbook_input
-
-
 def run_testspec_sync(args: argparse.Namespace) -> int:
     """Read, validate and sync the workbook.  Returns the process exit code."""
-    workbook_input = _read_input(args)
+    workbook_input = read_input(args)
     if workbook_input is None:
         return 1
     suite, cases = workbook_input

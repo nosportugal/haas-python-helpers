@@ -11,7 +11,7 @@ from sync_confluence.confluence.sync_cli import (
     add_page_metadata_args,
     env_or_default,
 )
-from sync_confluence.testspec._model import TestSpecError
+from sync_confluence.testspec._suite import suite_from_filename, validate_suite_id
 
 _TRUTHY_ENV_VALUES = ("1", "true", "yes")
 REQUIRED_ARGS = (
@@ -39,10 +39,11 @@ def parse_testspec_sync_args(argv: Optional[list[str]] = None) -> argparse.Names
         "--suite",
         default=env_or_default("TESTSPEC_SUITE"),
         help=(
-            "Suite name added to folder and page titles (Confluence titles are "
+            "Suite ID added to folder and page titles (Confluence titles are "
             "unique per space) and used to scope orphan cleanup to this "
-            "workbook's pages. Defaults to the workbook file name without "
-            "extension (env: TESTSPEC_SUITE)."
+            "workbook's pages, e.g. HAAS-L3VPN-CISCO. Defaults to the ID at "
+            "the start of the workbook file name, "
+            "<ID>[__<description>].xlsx (env: TESTSPEC_SUITE)."
         ),
     )
     parser.add_argument(
@@ -72,8 +73,10 @@ def missing_required(args: argparse.Namespace) -> list[str]:
 
 
 def resolve_suite(args: argparse.Namespace) -> str:
-    """Return ``--suite`` or, when unset, the workbook file name without extension."""
-    suite = (args.suite or Path(args.xlsx).stem).strip()
-    if not suite or "/" in suite:
-        raise TestSpecError(f"Invalid suite name {suite!r}: must be non-empty, no '/'")
-    return suite
+    """Return the suite ID: ``--suite`` or the one in the workbook file name.
+
+    Both go through the same check, so ``--suite`` cannot bypass the rule.
+    """
+    if args.suite:
+        return validate_suite_id(args.suite)
+    return suite_from_filename(Path(args.xlsx).name)

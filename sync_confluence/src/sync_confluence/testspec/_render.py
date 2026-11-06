@@ -5,10 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from sync_confluence.converter._csf import ElementType
-from sync_confluence.converter._generated_by import prepend_generated_by
-from sync_confluence.converter._result import ConverterOptions, SourcePaths
-from sync_confluence.converter._validate import parse_document, serialize_document
+from sync_confluence.confluence.storage_format import (
+    ElementType,
+    parse_document,
+    prepend_generated_by_banner,
+    serialize_document,
+)
 from sync_confluence.testspec._csf_table import (
     append_table,
     set_multiline,
@@ -42,8 +44,5 @@ def render_test_case(
     append_table(root, case.inputs)
     sub_element(root, "h2", "Outputs")
     append_table(root, case.outputs)
-    options = ConverterOptions(
-        generated_by=generated_by, paths=SourcePaths(current_file=source_file)
-    )
-    prepend_generated_by(root, options)
+    prepend_generated_by_banner(root, generated_by, Path(source_file.name))
     return serialize_document(root)

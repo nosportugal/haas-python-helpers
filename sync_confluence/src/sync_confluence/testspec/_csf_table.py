@@ -7,8 +7,7 @@ from typing import Optional
 
 from lxml import etree
 
-from sync_confluence.converter._code import _plain_text_macro
-from sync_confluence.converter._csf import ElementType
+from sync_confluence.confluence.storage_format import ElementType, build_code_macro
 from sync_confluence.testspec._join import CLI_COLUMN, JSON_COLUMN
 from sync_confluence.testspec._model import SheetTable
 
@@ -39,7 +38,7 @@ def _cell(row: ElementType, header: str, text: str) -> None:
     language_key = header.casefold()
     if language_key in _CODE_LANGUAGES and text.strip():
         language = _CODE_LANGUAGES[language_key]
-        cell.append(_plain_text_macro("code", text, language))
+        cell.append(build_code_macro(text, language))
         return
     set_multiline(cell, text)
 

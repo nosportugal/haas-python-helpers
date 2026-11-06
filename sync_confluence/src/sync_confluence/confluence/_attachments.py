@@ -6,7 +6,7 @@ from atlassian import Confluence
 
 from sync_confluence.confluence._constants import _Keys
 from sync_confluence.confluence._logging import log
-from sync_confluence.converter import Attachment
+from sync_confluence.confluence.storage_format import Attachment
 
 
 def _do_upload(confluence: Confluence, page_id: str, attachment: Attachment) -> None:

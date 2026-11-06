@@ -7,19 +7,19 @@ import logging
 from atlassian import Confluence
 
 from sync_confluence.confluence import (
+    DRY_RUN_PAGE_ID,
     FolderUpsertRequest,
+    PageSyncAction,
     PageUpsertRequest,
     build_source_path_map,
+    find_folder_under_parent,
     upsert_folder,
     upsert_page,
 )
-from sync_confluence.confluence._constants import _DRY_RUN_ID, _Actions, _Keys
-from sync_confluence.confluence._lookup import _find_folder_under_parent
+from sync_confluence.confluence.sync_cli import SyncResult, new_sync_result
 from sync_confluence.testspec._labels import page_labels
 from sync_confluence.testspec._model import TestCase, TestSpecSyncConfig
 from sync_confluence.testspec._render import render_test_case
-from sync_confluence.traversal import SyncResult
-from sync_confluence.traversal._state import _new_sync_result
 
 log = logging.getLogger(__name__)
 
@@ -44,11 +44,11 @@ def _upsert_vendor_folder(
     if config.dry_run:
         # upsert_folder returns a placeholder id in dry-run, which would make
         # every existing page look new; use the real folder when there is one.
-        existing = _find_folder_under_parent(
+        existing = find_folder_under_parent(
             confluence, config.space_key, vendor, config.parent_id
         )
         if existing:
-            return existing[_Keys.ID]
+            return existing["id"]
     folder_id, _ = upsert_folder(
         confluence,
         FolderUpsertRequest(
@@ -87,7 +87,7 @@ def _page_request(
 def _record(outcome: SyncResult, request: PageUpsertRequest, action: str) -> None:
     log.info("%s: %s", action, request.title)
     outcome.stats[action] += 1
-    if action == _Actions.SKIPPED:
+    if action == PageSyncAction.SKIPPED:
         outcome.skipped.append(request.title)
         return
     outcome.expected_titles.add(request.title)
@@ -105,7 +105,7 @@ def _sync_vendor(
     outcome.expected_titles.add(vendor)
     outcome.expected_paths.add(f"{_SOURCE_PREFIX}/{vendor}")
     path_map = {}
-    if folder_id != _DRY_RUN_ID:
+    if folder_id != DRY_RUN_PAGE_ID:
         path_map = build_source_path_map(confluence, folder_id)
     for case in cases:
         request = _page_request(case, folder_id, path_map, config)
@@ -116,7 +116,7 @@ def sync_test_cases(
     confluence: Confluence, cases: list[TestCase], config: TestSpecSyncConfig
 ) -> SyncResult:
     """Upsert a folder per vendor and a page per test case under the parent."""
-    outcome = _new_sync_result()
+    outcome = new_sync_result()
     for vendor_cases in _group_by_vendor(cases).values():
         _sync_vendor(confluence, vendor_cases, config, outcome)
     return outcome

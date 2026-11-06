@@ -11,10 +11,9 @@ from atlassian import Confluence
 
 from sync_confluence.cli._env import _detect_repo_url
 from sync_confluence.cli._resolve import _resolve_managed_by_label
+from sync_confluence.confluence import DRY_RUN_PAGE_ID
 
 log = logging.getLogger(__name__)
-
-_DRY_RUN_ID = "DRY-RUN"
 
 
 @dataclass
@@ -47,7 +46,7 @@ def _resolve_restrict_edits_to(
         return None
     if args.dry_run:
         log.info("[DRY-RUN] Would apply edit restrictions (authenticated user)")
-        return _DRY_RUN_ID
+        return DRY_RUN_PAGE_ID
     account_id = user_details["accountId"]
     log.info("Edit restrictions enabled for accountId=%s", account_id)
     return account_id

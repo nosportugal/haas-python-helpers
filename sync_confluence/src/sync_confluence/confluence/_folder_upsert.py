@@ -6,7 +6,7 @@ from atlassian import Confluence
 
 from sync_confluence.confluence._constants import (
     _SOURCE_PATH_PROPERTY_KEY,
-    _Actions,
+    PageSyncAction,
     _Keys,
 )
 from sync_confluence.confluence._folder_create import (
@@ -14,7 +14,7 @@ from sync_confluence.confluence._folder_create import (
     _upsert_folder_dry_run,
 )
 from sync_confluence.confluence._logging import log
-from sync_confluence.confluence._lookup import _find_folder_under_parent
+from sync_confluence.confluence._lookup import find_folder_under_parent
 from sync_confluence.confluence._properties import _apply_label, _try_property_set
 from sync_confluence.confluence._types import FolderUpsertRequest
 
@@ -34,7 +34,7 @@ def _refresh_existing_folder(
             request.source_path,
             "source path",
         )
-    return (existing_id, _Actions.UNCHANGED)
+    return (existing_id, PageSyncAction.UNCHANGED)
 
 
 def upsert_folder(
@@ -50,7 +50,7 @@ def upsert_folder(
     """
     if request.dry_run:
         return _upsert_folder_dry_run(request)
-    existing = _find_folder_under_parent(
+    existing = find_folder_under_parent(
         confluence, request.space_key, request.title, request.parent_id
     )
     if existing:

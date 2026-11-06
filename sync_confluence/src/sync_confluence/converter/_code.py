@@ -6,15 +6,17 @@ import logging
 import re
 from typing import Optional
 
-from lxml import etree
-
-from sync_confluence.converter._csf import AC, RI, ElementType, qname
-from sync_confluence.converter._languages import _PLAIN_TEXT_ALIASES, resolve_language
-from sync_confluence.converter._result import (
+from sync_confluence.confluence.storage_format import (
+    AC,
+    RI,
     Attachment,
-    ConversionResult,
-    ConverterOptions,
+    ElementType,
+    build_code_macro,
+    build_plain_text_macro,
+    qname,
 )
+from sync_confluence.converter._languages import _PLAIN_TEXT_ALIASES, resolve_language
+from sync_confluence.converter._result import ConversionResult, ConverterOptions
 
 log = logging.getLogger(__name__)
 
@@ -29,18 +31,6 @@ def _language_name(code: ElementType) -> Optional[str]:
         return None
     match = _LANGUAGE_CLASS_RE.search(class_attr)
     return match.group(1) if match else None
-
-
-def _plain_text_macro(
-    macro_name: str, text: str, language: Optional[str] = None
-) -> ElementType:
-    macro = AC("structured-macro", {qname(_AC, "name"): macro_name})
-    if language:
-        macro.append(AC("parameter", language, {qname(_AC, "name"): "language"}))
-    body = AC("plain-text-body")
-    body.text = etree.CDATA(text)
-    macro.append(body)
-    return macro
 
 
 def _rendered_image_element(
@@ -76,7 +66,7 @@ def _build_macro(
             return _rendered_image_element(attachment, rendered.width, rendered.height)
         log.warning("Mermaid renderer returned None; falling back")
     if name == "mermaid" and options.mermaid_macro:
-        return _plain_text_macro(options.mermaid_macro, text)
+        return build_plain_text_macro(options.mermaid_macro, text)
     language = resolve_language(name, force_valid=options.force_valid_language)
     if (
         name
@@ -85,7 +75,7 @@ def _build_macro(
         and name.lower() not in _PLAIN_TEXT_ALIASES
     ):
         log.warning("Dropping unsupported code language '%s'", name)
-    return _plain_text_macro("code", text, language)
+    return build_code_macro(text, language)
 
 
 def transform_code_blocks(

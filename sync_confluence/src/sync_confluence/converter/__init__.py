@@ -1,27 +1,30 @@
-"""Markdown-to-Confluence-Storage-Format conversion.
+"""Deprecated import path: use ``sync_confluence.markdown.converter`` instead.
 
-Public surface (re-exported for backwards compatibility with the previous
-single-module layout):
-
-- :func:`convert_markdown` — render Markdown to a CSF fragment.
-- :func:`derive_title` — derive a page title from a Markdown file path.
-- :class:`ConversionResult`, :class:`ConverterOptions`, :class:`RepoContext`,
-  :class:`SourcePaths` — conversion input/output types.
-- :class:`RenderedImage`, :class:`MermaidRenderer` — renderer port types.
+.. deprecated:: 0.2.0
+   Removal is planned for 0.3.0.
 """
 
-from sync_confluence.converter._render import convert_markdown
-from sync_confluence.converter._result import (
+import warnings
+
+from sync_confluence.markdown.converter import (
     Attachment,
+    ConversionError,
     ConversionResult,
     ConverterOptions,
     MermaidRenderer,
     RenderedImage,
     RepoContext,
     SourcePaths,
+    convert_markdown,
+    derive_title,
 )
-from sync_confluence.converter._title import derive_title
-from sync_confluence.converter._validate import ConversionError
+
+warnings.warn(
+    "sync_confluence.converter is deprecated; "
+    "import from sync_confluence.markdown.converter",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = [
     "Attachment",

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from atlassian import Confluence
 
-from sync_confluence.confluence._constants import _DRY_RUN_ID, _Actions, _Keys
+from sync_confluence.confluence._constants import DRY_RUN_PAGE_ID, PageSyncAction, _Keys
 from sync_confluence.confluence._logging import log
-from sync_confluence.confluence._lookup import _find_page_under_parent
+from sync_confluence.confluence._lookup import find_page_under_parent
 from sync_confluence.confluence._page_metadata import (
     _log_dry_run_metadata,
     _rename_target,
@@ -33,17 +33,17 @@ def _dry_run_existing_page(
         prop_val = None
     if prop_val == _content_hash(request.body):
         log.debug("[DRY-RUN] Unchanged: '%s' (id=%s)", request.title, existing_id)
-        return (existing_id, _Actions.UNCHANGED)
+        return (existing_id, PageSyncAction.UNCHANGED)
     log.info("[DRY-RUN] Would update '%s' (id=%s)", request.title, existing_id)
     _log_dry_run_metadata(request)
-    return (existing_id, _Actions.UPDATED)
+    return (existing_id, PageSyncAction.UPDATED)
 
 
 def _upsert_page_dry_run(
     confluence: Confluence, request: PageUpsertRequest
 ) -> tuple[str, str]:
     """Simulate :func:`upsert_page` for dry-run mode."""
-    existing = _find_page_under_parent(
+    existing = find_page_under_parent(
         confluence, request.space_key, request.title, request.parent_id
     )
     if existing:
@@ -56,6 +56,6 @@ def _upsert_page_dry_run(
             request.title,
         )
         _log_dry_run_metadata(request)
-        return (_DRY_RUN_ID, _Actions.UPDATED)
+        return (DRY_RUN_PAGE_ID, PageSyncAction.UPDATED)
     _log_dry_run_metadata(request)
-    return (_DRY_RUN_ID, _Actions.CREATED)
+    return (DRY_RUN_PAGE_ID, PageSyncAction.CREATED)

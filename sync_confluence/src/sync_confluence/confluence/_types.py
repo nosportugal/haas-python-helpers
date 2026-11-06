@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-from sync_confluence.converter import Attachment
+from sync_confluence.confluence.storage_format import Attachment
 
 
 @dataclass

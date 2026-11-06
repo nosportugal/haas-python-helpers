@@ -6,13 +6,12 @@ import argparse
 import logging
 from pathlib import Path
 
-from sync_confluence.cli._auth import _AuthInfo
 from sync_confluence.cli._docs import _DocsInfo
 from sync_confluence.cli._plan import _SyncPlan
 from sync_confluence.cli._resolve import _SYNC_MODE_FILES
+from sync_confluence.confluence.sync_cli import ConfluenceSession, SyncResult
 from sync_confluence.traversal import (
     SyncContext,
-    SyncResult,
     build_doc_index,
     sync_directory,
     sync_files,
@@ -29,7 +28,7 @@ def _collect_index_files(docs: _DocsInfo) -> list[Path]:
 
 
 def _build_sync_context(
-    args: argparse.Namespace, docs: _DocsInfo, auth: _AuthInfo
+    args: argparse.Namespace, docs: _DocsInfo, auth: ConfluenceSession
 ) -> SyncContext:
     if args.dry_run:
         renderer = None
@@ -59,7 +58,10 @@ def _build_sync_context(
 
 
 def _dispatch_sync(
-    args: argparse.Namespace, docs: _DocsInfo, auth: _AuthInfo, plan: _SyncPlan
+    args: argparse.Namespace,
+    docs: _DocsInfo,
+    auth: ConfluenceSession,
+    plan: _SyncPlan,
 ) -> SyncResult:
     ctx = _build_sync_context(args, docs, auth)
     if docs.mode == _SYNC_MODE_FILES:

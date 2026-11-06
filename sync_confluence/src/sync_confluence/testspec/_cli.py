@@ -7,10 +7,15 @@ import logging
 import sys
 from pathlib import Path
 
-from sync_confluence.cli._auth import _AuthInfo, _prepare_auth
-from sync_confluence.cli._finalise import _finalise_run
-from sync_confluence.cli._plan import _SyncPlan
-from sync_confluence.testspec._args import missing_required, parse_args
+from sync_confluence.confluence.sync_cli import (
+    ConfluenceSession,
+    finalise_sync_run,
+    open_confluence_session,
+)
+from sync_confluence.testspec._args import (
+    missing_required,
+    parse_testspec_sync_args,
+)
 from sync_confluence.testspec._model import TestSpecError, TestSpecSyncConfig
 from sync_confluence.testspec._reader import read_workbook
 from sync_confluence.testspec._sync import sync_test_cases
@@ -18,7 +23,9 @@ from sync_confluence.testspec._sync import sync_test_cases
 log = logging.getLogger(__name__)
 
 
-def _sync_config(args: argparse.Namespace, auth: _AuthInfo) -> TestSpecSyncConfig:
+def _sync_config(
+    args: argparse.Namespace, auth: ConfluenceSession
+) -> TestSpecSyncConfig:
     return TestSpecSyncConfig(
         space_key=args.space,
         parent_id=args.parent_id,
@@ -31,7 +38,7 @@ def _sync_config(args: argparse.Namespace, auth: _AuthInfo) -> TestSpecSyncConfi
     )
 
 
-def run(args: argparse.Namespace) -> int:
+def run_testspec_sync(args: argparse.Namespace) -> int:
     """Read, validate and sync the workbook.  Returns the process exit code."""
     try:
         cases = read_workbook(Path(args.xlsx))
@@ -39,17 +46,17 @@ def run(args: argparse.Namespace) -> int:
         log.error("Cannot read %s: %s", args.xlsx, exc)
         return 1
     log.info("Read %d test case(s) from %s", len(cases), args.xlsx)
-    auth = _prepare_auth(args)
+    auth = open_confluence_session(args)
     if auth is None:
         return 1
     sync_result = sync_test_cases(auth.confluence, cases, _sync_config(args, auth))
-    plan = _SyncPlan(parent_id=args.parent_id, readme_as_parent=False, depth=0)
-    _finalise_run(sync_result, auth, plan, args)
+    finalise_sync_run(sync_result, auth, args.parent_id, args.dry_run)
     return 1 if sync_result.skipped else 0
 
 
-def main() -> None:
-    args = parse_args()
+def testspec_sync_main() -> None:
+    """Run the ``sync-confluence-testspec`` command-line entry point."""
+    args = parse_testspec_sync_args()
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(levelname)s: %(message)s",
@@ -59,4 +66,4 @@ def main() -> None:
     if missing:
         log.error("Missing required configuration: %s", ", ".join(missing))
         sys.exit(2)
-    sys.exit(run(args))
+    sys.exit(run_testspec_sync(args))

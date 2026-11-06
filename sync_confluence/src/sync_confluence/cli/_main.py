@@ -7,11 +7,13 @@ import logging
 import sys
 
 from sync_confluence.cli._args import parse_args, validate_args
-from sync_confluence.cli._auth import _prepare_auth
 from sync_confluence.cli._dispatch import _dispatch_sync
 from sync_confluence.cli._docs import _resolve_docs
-from sync_confluence.cli._finalise import _finalise_run
 from sync_confluence.cli._plan import _resolve_sync_plan
+from sync_confluence.confluence.sync_cli import (
+    finalise_sync_run,
+    open_confluence_session,
+)
 
 log = logging.getLogger(__name__)
 
@@ -27,12 +29,12 @@ def run(args: argparse.Namespace) -> int:
     docs = _resolve_docs(args)
     if docs is None:
         return 1
-    auth = _prepare_auth(args)
+    auth = open_confluence_session(args)
     if auth is None:
         return 1
     plan = _resolve_sync_plan(auth.confluence, args, auth.managed_by_label)
     sync_result = _dispatch_sync(args, docs, auth, plan)
-    _finalise_run(sync_result, auth, plan, args)
+    finalise_sync_run(sync_result, auth, plan.parent_id, args.dry_run)
     return 1 if sync_result.skipped else 0
 
 

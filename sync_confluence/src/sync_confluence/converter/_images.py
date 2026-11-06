@@ -6,13 +6,15 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from sync_confluence.converter._csf import AC, RI, ElementType, qname
-from sync_confluence.converter._naming import attachment_name
-from sync_confluence.converter._result import (
+from sync_confluence.confluence.storage_format import (
+    AC,
+    RI,
     Attachment,
-    ConversionResult,
-    ConverterOptions,
+    ElementType,
+    qname,
 )
+from sync_confluence.converter._naming import attachment_name
+from sync_confluence.converter._result import ConversionResult, ConverterOptions
 
 log = logging.getLogger(__name__)
 

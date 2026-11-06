@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from sync_confluence.confluence.sync_cli import SyncResult
 from sync_confluence.traversal._anchor import _anchor
 from sync_confluence.traversal._md_files import _sync_md_files, _sync_one_md_file
-from sync_confluence.traversal._state import SyncContext, SyncResult, log
+from sync_confluence.traversal._state import SyncContext, log
 from sync_confluence.traversal._subdirs import _create_subfolder
 from sync_confluence.traversal._sync_state import _new_state, _Sync
 

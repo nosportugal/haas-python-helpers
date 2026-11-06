@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from sync_confluence.confluence import (
+    DRY_RUN_PAGE_ID,
     FolderUpsertRequest,
     PageUpsertRequest,
     build_source_path_map,
@@ -18,8 +19,6 @@ from sync_confluence.converter import (
     derive_title,
 )
 from sync_confluence.traversal._state import SyncContext
-
-_DRY_RUN_ID = "DRY-RUN"
 
 
 def _collect_md_files(directory: Path, readme_as_parent: bool) -> list[Path]:
@@ -112,6 +111,6 @@ class _RequestBuilder:
         )
 
     def build_path_map(self, page_id: str) -> dict[str, str]:
-        if self._ctx.dry_run or page_id == _DRY_RUN_ID:
+        if self._ctx.dry_run or page_id == DRY_RUN_PAGE_ID:
             return {}
         return build_source_path_map(self._ctx.confluence, page_id)

@@ -9,15 +9,15 @@ from typing import Optional
 
 from atlassian import Confluence
 
-from sync_confluence.confluence import FolderUpsertRequest, upsert_folder
-from sync_confluence.confluence._lookup import (
-    _find_folder_under_parent,
-    _find_page_under_parent,
+from sync_confluence.confluence import (
+    DRY_RUN_PAGE_ID,
+    FolderUpsertRequest,
+    find_folder_under_parent,
+    find_page_under_parent,
+    upsert_folder,
 )
 
 log = logging.getLogger(__name__)
-
-_DRY_RUN_ID = "DRY-RUN"
 
 
 @dataclass
@@ -32,11 +32,11 @@ class _SyncPlan:
 def _find_or_create_root_parent(
     confluence: Confluence, args: argparse.Namespace, managed_by_label: Optional[str]
 ) -> str:
-    existing = _find_folder_under_parent(
+    existing = find_folder_under_parent(
         confluence, args.space, args.root_parent, args.parent_id
     )
     if existing is None:
-        existing = _find_page_under_parent(
+        existing = find_page_under_parent(
             confluence, args.space, args.root_parent, args.parent_id
         )
     if existing:
@@ -70,7 +70,7 @@ def _resolve_root_parent(
             args.root_parent,
             args.parent_id,
         )
-        return _DRY_RUN_ID
+        return DRY_RUN_PAGE_ID
     return _find_or_create_root_parent(confluence, args, managed_by_label)
 
 

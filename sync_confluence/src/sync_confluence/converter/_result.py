@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Protocol
 
+from sync_confluence.confluence.storage_format import Attachment
+
 
 @dataclass(frozen=True)
 class RenderedImage:
@@ -77,24 +79,6 @@ class ConverterOptions:
     generated_by: Optional[str] = None
     force_valid_language: bool = True
     mermaid_renderer: Optional[MermaidRenderer] = None
-
-
-@dataclass(frozen=True)
-class Attachment:
-    """A file to upload alongside a page.
-
-    For local images *path* is the absolute source path; *name* is the
-    flattened attachment filename used for the ``ri:filename`` reference and
-    the upload.
-
-    For rendered diagrams (e.g. Mermaid SVG) *path* is ``None`` and
-    *raw_bytes* / *content_type* carry the in-memory payload.
-    """
-
-    name: str
-    path: Optional[Path] = None
-    raw_bytes: Optional[bytes] = None
-    content_type: Optional[str] = None
 
 
 @dataclass

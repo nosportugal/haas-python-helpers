@@ -1,3 +1,3 @@
-from sync_confluence.testspec import main
+from sync_confluence.testspec import testspec_sync_main
 
-main()
+testspec_sync_main()

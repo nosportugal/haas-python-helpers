@@ -7,18 +7,20 @@ import logging
 
 from sync_confluence.cli._auth import _AuthInfo
 from sync_confluence.cli._plan import _SyncPlan
-from sync_confluence.confluence import DeleteOrphansRequest, delete_orphans
+from sync_confluence.confluence import (
+    DRY_RUN_PAGE_ID,
+    DeleteOrphansRequest,
+    delete_orphans,
+)
 from sync_confluence.traversal import SyncResult
 
 log = logging.getLogger(__name__)
-
-_DRY_RUN_ID = "DRY-RUN"
 
 
 def _run_orphan_cleanup(
     auth: _AuthInfo, parent_id: str, sync_result: SyncResult, dry_run: bool
 ) -> int:
-    if parent_id == _DRY_RUN_ID:
+    if parent_id == DRY_RUN_PAGE_ID:
         log.info("[DRY-RUN] Skipping orphan check — parent page does not exist yet")
         return 0
     if not auth.managed_by_label:

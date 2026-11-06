@@ -10,7 +10,7 @@ from sync_confluence.confluence._constants import _Keys
 from sync_confluence.confluence._logging import _suppress_atlassian_not_found, log
 
 
-def _find_page_under_parent(
+def find_page_under_parent(
     confluence: Confluence,
     space_key: str,
     title: str,
@@ -92,7 +92,7 @@ def _find_folder_by_space_cql(
     return None
 
 
-def _find_folder_under_parent(
+def find_folder_under_parent(
     confluence: Confluence,
     space_key: str,
     title: str,

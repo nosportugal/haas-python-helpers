@@ -7,9 +7,9 @@ from typing import Optional
 from atlassian import Confluence
 
 from sync_confluence.confluence._constants import (
-    _DRY_RUN_ID,
     _SOURCE_PATH_PROPERTY_KEY,
-    _Actions,
+    DRY_RUN_PAGE_ID,
+    PageSyncAction,
     _Keys,
 )
 from sync_confluence.confluence._logging import log
@@ -25,7 +25,7 @@ def _upsert_folder_dry_run(request: FolderUpsertRequest) -> tuple[str, str]:
             request.title,
             request.managed_by_label,
         )
-    return (_DRY_RUN_ID, _Actions.CREATED)
+    return (DRY_RUN_PAGE_ID, PageSyncAction.CREATED)
 
 
 def _post_create_folder_setup(
@@ -96,8 +96,8 @@ def _create_folder_with_fallback(
                 request.title,
                 fallback_id,
             )
-            return (fallback_id, _Actions.UNCHANGED)
+            return (fallback_id, PageSyncAction.UNCHANGED)
         raise
     log.info("Created folder: '%s' (id=%s)", request.title, folder_id)
     _post_create_folder_setup(confluence, folder_id, request)
-    return (folder_id, _Actions.CREATED)
+    return (folder_id, PageSyncAction.CREATED)

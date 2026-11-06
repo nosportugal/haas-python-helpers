@@ -5,25 +5,16 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import Optional
 
 from atlassian import Confluence
 
+from sync_confluence.confluence.sync_cli import SyncResult, new_sync_result
 from sync_confluence.converter import MermaidRenderer
 
 log = logging.getLogger(__name__)
 
 _ACTION_SKIPPED = "skipped"
-
-
-class SyncResult(NamedTuple):
-    """Collected outcome of a sync operation."""
-
-    page_map: dict[str, str]
-    expected_titles: set[str]
-    expected_paths: set[str]
-    skipped: list[str]
-    stats: dict[str, int]
 
 
 @dataclass
@@ -46,22 +37,12 @@ class SyncContext:
     mermaid_renderer: Optional[MermaidRenderer] = None
 
 
-def _new_sync_result() -> SyncResult:
-    return SyncResult(
-        page_map={},
-        expected_titles=set(),
-        expected_paths=set(),
-        skipped=[],
-        stats={"created": 0, "updated": 0, "unchanged": 0, _ACTION_SKIPPED: 0},
-    )
-
-
 class _SyncRecorder:
     """Accumulates the :class:`SyncResult` for one walk."""
 
     def __init__(self, docs_root: Path) -> None:
         self._docs_root = docs_root
-        self.outcome = _new_sync_result()
+        self.outcome = new_sync_result()
 
     def record_page(
         self,

@@ -5,8 +5,11 @@ from __future__ import annotations
 import argparse
 from typing import Optional
 
-from sync_confluence.cli._args import _add_connection_args, _add_meta_args
-from sync_confluence.cli._env import _env
+from sync_confluence.confluence.sync_cli import (
+    add_confluence_connection_args,
+    add_page_metadata_args,
+    env_or_default,
+)
 
 REQUIRED_ARGS = (
     ("url", "--url / CONFLUENCE_URL"),
@@ -18,14 +21,15 @@ REQUIRED_ARGS = (
 )
 
 
-def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+def parse_testspec_sync_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+    """Parse ``sync-confluence-testspec`` command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Sync a test-specification workbook (.xlsx) to Confluence Cloud.",
     )
-    _add_connection_args(parser)
+    add_confluence_connection_args(parser)
     parser.add_argument(
         "--xlsx",
-        default=_env("TESTSPEC_XLSX"),
+        default=env_or_default("TESTSPEC_XLSX"),
         help="Path to the test-specification workbook (env: TESTSPEC_XLSX).",
     )
     parser.add_argument(
@@ -33,7 +37,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Preview pages that would be created/updated/deleted.",
     )
-    _add_meta_args(parser)
+    add_page_metadata_args(parser)
     return parser.parse_args(argv)
 
 

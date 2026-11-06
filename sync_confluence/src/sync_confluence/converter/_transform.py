@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from sync_confluence.confluence.storage_format import ElementType
 from sync_confluence.converter._admonitions import transform_admonitions
 from sync_confluence.converter._blocks import transform_blocks
 from sync_confluence.converter._code import transform_code_blocks
-from sync_confluence.converter._csf import ElementType
-from sync_confluence.converter._generated_by import prepend_generated_by
+from sync_confluence.converter._generated_by import (
+    prepend_markdown_generated_by_banner,
+)
 from sync_confluence.converter._images import transform_images
 from sync_confluence.converter._links import transform_links
 from sync_confluence.converter._result import ConversionResult, ConverterOptions
@@ -25,4 +27,4 @@ def transform_tree(
     transform_widgets(root)
     transform_links(root, options)
     transform_images(root, options, conversion)
-    prepend_generated_by(root, options)
+    prepend_markdown_generated_by_banner(root, options)

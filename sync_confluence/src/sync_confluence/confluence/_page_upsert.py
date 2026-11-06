@@ -7,9 +7,9 @@ from typing import Optional
 from atlassian import Confluence
 
 from sync_confluence.confluence._attachments import upload_attachments
-from sync_confluence.confluence._constants import _Actions, _Keys
+from sync_confluence.confluence._constants import PageSyncAction, _Keys
 from sync_confluence.confluence._logging import _suppress_atlassian_not_found, log
-from sync_confluence.confluence._lookup import _find_page_under_parent
+from sync_confluence.confluence._lookup import find_page_under_parent
 from sync_confluence.confluence._page_dry_run import _upsert_page_dry_run
 from sync_confluence.confluence._page_metadata import (
     _apply_page_metadata,
@@ -55,7 +55,7 @@ def _handle_page_rename(
     )
     _apply_page_metadata(confluence, rename_id, request, _content_hash(request.body))
     _apply_attachments(confluence, rename_id, request)
-    return (rename_id, _Actions.UPDATED)
+    return (rename_id, PageSyncAction.UPDATED)
 
 
 def _check_title_collision(
@@ -82,7 +82,7 @@ def _check_title_collision(
         request.title,
         conflicting_page[_Keys.ID],
     )
-    return (None, _Actions.SKIPPED)
+    return (None, PageSyncAction.SKIPPED)
 
 
 def _update_existing_page(
@@ -102,7 +102,7 @@ def _update_existing_page(
 
     if prop_val == body_hash:
         log.debug("Unchanged: '%s' (id=%s)", request.title, existing_id)
-        return (existing_id, _Actions.UNCHANGED)
+        return (existing_id, PageSyncAction.UNCHANGED)
 
     confluence.update_page(
         page_id=existing_id,
@@ -115,7 +115,7 @@ def _update_existing_page(
     log.info("Updated: '%s' (id=%s)", request.title, existing_id)
     _apply_page_metadata(confluence, existing_id, request, body_hash)
     _apply_attachments(confluence, existing_id, request)
-    return (existing_id, _Actions.UPDATED)
+    return (existing_id, PageSyncAction.UPDATED)
 
 
 def _create_new_page(
@@ -140,7 +140,7 @@ def _create_new_page(
     )
     _apply_page_width(confluence, page_id, request.page_width)
     _apply_attachments(confluence, page_id, request)
-    return (page_id, _Actions.CREATED)
+    return (page_id, PageSyncAction.CREATED)
 
 
 def upsert_page(
@@ -164,7 +164,7 @@ def upsert_page(
     """
     if request.dry_run:
         return _upsert_page_dry_run(confluence, request)
-    existing = _find_page_under_parent(
+    existing = find_page_under_parent(
         confluence, request.space_key, request.title, request.parent_id
     )
     if existing is not None:

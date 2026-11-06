@@ -1,4 +1,4 @@
-"""Resolve docs location and managed-by label from CLI arguments."""
+"""Resolve the docs location (directory or files) from CLI arguments."""
 
 from __future__ import annotations
 
@@ -7,8 +7,6 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
-
-from sync_confluence.cli._env import _label_from_repo_url
 
 log = logging.getLogger(__name__)
 
@@ -48,21 +46,3 @@ def _resolve_docs_root(
         ", ".join(f"{dir_name}/" for dir_name in _DOCS_CANDIDATES),
     )
     return None, _SYNC_MODE_DIR, []
-
-
-def _resolve_managed_by_label(
-    args: argparse.Namespace, repo_url: Optional[str]
-) -> Optional[str]:
-    """Resolve the managed-by Confluence label from explicit arg or repo URL."""
-    if args.managed_by:
-        managed_by: Optional[str] = args.managed_by
-        log.info("Managed-by label: %s (explicit)", managed_by)
-        return managed_by
-    if repo_url:
-        managed_by = _label_from_repo_url(repo_url)
-        log.info("Managed-by label: %s (derived from repository name)", managed_by)
-        return managed_by
-    log.warning(
-        "Orphan cleanup will target ALL pages under the parent regardless of origin."
-    )
-    return None

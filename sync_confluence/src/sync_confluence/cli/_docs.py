@@ -12,16 +12,15 @@ from sync_confluence.cli._resolve import (
     _DocsInfo,
     _resolve_docs_root,
 )
+from sync_confluence.confluence import DRY_RUN_PAGE_ID
 
 log = logging.getLogger(__name__)
-
-_DRY_RUN_ID = "DRY-RUN"
 
 
 def _log_sync_target(
     sync_mode: str, docs_files: list[Path], docs_root: Path, dry_run: bool
 ) -> None:
-    mode_label = _DRY_RUN_ID if dry_run else "LIVE"
+    mode_label = DRY_RUN_PAGE_ID if dry_run else "LIVE"
     if sync_mode == _SYNC_MODE_FILES:
         log.info("Syncing %d file(s)  |  Mode: %s", len(docs_files), mode_label)
     else:

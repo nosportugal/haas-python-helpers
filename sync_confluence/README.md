@@ -44,7 +44,7 @@ pip install git+https://github.com/nosportugal/haas-python-helpers.git#subdirect
 Add `--dry-run` to preview what would be created, updated, or deleted without making any API calls.
 
 ```bash
-python -m sync_confluence \
+sync-confluence-markdown \
   --url  https://acme.atlassian.net \
   --email user@acme.com \
   --token <api-token> \
@@ -55,7 +55,7 @@ python -m sync_confluence \
 ### CLI Example: Sync a flat list of Markdown files
 
 ```bash
-python -m sync_confluence \
+sync-confluence-markdown \
   --url https://acme.atlassian.net \
   --email user@acme.com \
   --token <api-token> \
@@ -75,7 +75,7 @@ export CONFLUENCE_API_TOKEN=<api-token>
 export CONFLUENCE_SPACE_KEY=DOCS
 export CONFLUENCE_PARENT_PAGE_ID=12345
 
-python -m sync_confluence
+sync-confluence-markdown
 ```
 
 ### Orphan cleanup (always active)
@@ -176,6 +176,27 @@ Labels are added, never removed, when tags change.
 Orphan cleanup works as for Markdown sync: managed pages and vendor folders under `--parent-id`
 that are no longer in the workbook are **permanently deleted**.
 
+## Deprecated aliases
+
+Deprecated in 0.2.0, removal planned for 0.3.0 — migrate to `sync-confluence-markdown`:
+
+- the `sync-confluence` command and `python -m sync_confluence` (they log a deprecation warning, then run `sync-confluence-markdown`);
+- the `sync_confluence.cli`, `sync_confluence.converter` and `sync_confluence.traversal` import paths (use `sync_confluence.markdown.cli`, `.converter` and `.traversal`).
+
+## Package layout
+
+```text
+sync_confluence/
+├── confluence/                  shared Confluence API (pages, folders, labels, cleanup)
+│   ├── storage_format/          Confluence Storage Format (CSF) XML builders; stdlib + lxml only
+│   └── sync_cli/                shared command-line plumbing (args, session, orphan cleanup, sync result)
+├── markdown/                    sync-confluence-markdown  (converter/, traversal/, cli/)
+└── testspec/                    sync-confluence-testspec
+```
+
+Lower layers never import higher ones; `tests/test_layout.py` enforces this.
+Front ends import shared code from package level (`sync_confluence.confluence[.storage_format|.sync_cli]`), never from another subpackage's `_private` module.
+
 ## Development
 
 First-time setup:
@@ -206,7 +227,7 @@ Add the following steps to your workflow to sync docs on every push to `main`:
 
 - name: Sync to Confluence
   run: |
-    python -m sync_confluence \
+    sync-confluence-markdown \
       --space "${{ vars.CONFLUENCE_SPACE_KEY }}" \
       --parent-id "${{ vars.CONFLUENCE_PARENT_PAGE_ID }}" \
       --git-ref "${{ github.ref_name }}"

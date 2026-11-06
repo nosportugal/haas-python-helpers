@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sync-confluence"
-version = "0.1.0"
+version = "0.2.0"
 description = "Sync a docs/ directory tree to Confluence Cloud as nested pages."
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
@@ -25,8 +25,9 @@ dependencies = [
 xlsx = ["openpyxl>=3.1"]
 
 [project.scripts]
-sync-confluence = "sync_confluence.cli:main"
-sync-confluence-testspec = "sync_confluence.testspec:main"
+sync-confluence = "sync_confluence.markdown.cli:deprecated_sync_confluence_main"
+sync-confluence-markdown = "sync_confluence.markdown.cli:markdown_sync_main"
+sync-confluence-testspec = "sync_confluence.testspec:testspec_sync_main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sync_confluence"]

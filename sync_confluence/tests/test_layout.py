@@ -8,10 +8,15 @@ allowed-import table: ``confluence.storage_format`` < ``confluence`` <
 from __future__ import annotations
 
 import ast
+import importlib
+import pkgutil
+import warnings
 from pathlib import Path
 from typing import Iterator
 
 import pytest
+
+import sync_confluence
 
 _SRC_ROOT = Path(__file__).resolve().parents[1] / "src"
 _PKG = "sync_confluence"
@@ -147,6 +152,37 @@ def test_source_tree_has_no_layering_violations() -> None:
         )
 
     assert not violations, "\n".join(violations)
+
+
+@pytest.mark.parametrize("shim", _SHIMS)
+def test_deprecated_shim_package_contains_only_init(shim: str) -> None:
+    shim_dir = _SRC_ROOT / _PKG / shim
+
+    assert sorted(path.name for path in shim_dir.glob("*.py")) == ["__init__.py"]
+
+
+def _all_module_names() -> list[str]:
+    """Every module in the package; ``__main__`` modules are skipped (they run)."""
+    # walk_packages imports each package to recurse, which triggers the shims'
+    # DeprecationWarning at collection time.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        return sorted(
+            module_info.name
+            for module_info in pkgutil.walk_packages(
+                sync_confluence.__path__, prefix=f"{_PKG}."
+            )
+            if not module_info.name.endswith(".__main__")
+        )
+
+
+@pytest.mark.parametrize("module_name", _all_module_names())
+def test_every_module_is_importable(module_name: str) -> None:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        module = importlib.import_module(module_name)
+
+    assert module.__name__ == module_name
 
 
 @pytest.mark.parametrize(

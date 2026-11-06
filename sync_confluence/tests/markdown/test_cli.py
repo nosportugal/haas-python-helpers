@@ -117,29 +117,6 @@ class TestValidateArgs:
         return _make_args(**overrides)
 
 
-class TestValidateArgsPageWidth:
-    """Tests for page_width validation in validate_args()."""
-
-    def test_invalid_page_width_env_exits(self):
-        with pytest.raises(SystemExit) as exc_info:
-            validate_args(_make_args(page_width="wide"))
-        assert exc_info.value.code == 2
-
-    def test_valid_page_width_passes(self):
-        validate_args(_make_args(page_width=_FULL_WIDTH))
-
-    def test_max_page_width_rejected(self):
-        with pytest.raises(SystemExit) as exc_info:
-            validate_args(_make_args(page_width="max"))
-        assert exc_info.value.code == 2
-
-    def test_none_page_width_passes(self):
-        validate_args(_make_args(page_width=None))
-
-    def _make_args(self, **overrides):
-        return _make_args(**overrides)
-
-
 def _make_args(**overrides: object) -> argparse.Namespace:
     defaults = {
         "url": "https://acme.atlassian.net",

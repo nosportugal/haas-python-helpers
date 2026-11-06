@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -180,6 +181,37 @@ class TestReadWorkbook:
     def test_requires_index_columns(self, tmp_path: Path) -> None:
         with pytest.raises(TestSpecError, match="no 'Vendor' column"):
             _read_with(tmp_path, Index=[["Test ID", "Name", "Description", "Type"]])
+
+    def test_rejects_index_without_test_cases(self, tmp_path: Path) -> None:
+        sheets = {"Index": [INDEX_HEADERS]}
+
+        with pytest.raises(TestSpecError, match="'Index' has no test cases"):
+            read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
+
+    def test_rejects_blank_parameter_name(self, tmp_path: Path) -> None:
+        sheets = _valid_sheets()
+        sheets["1.1 - Inputs"] = [["Parameter", "Value"], ["mtu", 1], [None, 9000]]
+
+        with pytest.raises(TestSpecError, match="data row 2: blank Parameter name"):
+            read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
+
+    @pytest.mark.parametrize(
+        ("cell_value", "expected"),
+        [
+            (datetime.datetime(2026, 11, 6), "2026-11-06"),
+            (datetime.datetime(2026, 11, 6, 9, 30, 45), "2026-11-06 09:30:45"),
+        ],
+    )
+    def test_datetime_cells_keep_non_midnight_time(
+        self, tmp_path: Path, cell_value: datetime.datetime, expected: str
+    ) -> None:
+        sheets = _valid_sheets()
+        sheets["1.1 - Inputs"] = [["Parameter", "Value"], ["mtu", cell_value]]
+
+        first, _ = read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
+
+        assert first.inputs is not None
+        assert first.inputs.rows[1][-1] == expected
 
 
 class TestRenderTestCase:

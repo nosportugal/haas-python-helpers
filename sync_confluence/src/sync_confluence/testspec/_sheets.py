@@ -11,6 +11,13 @@ from openpyxl.worksheet.worksheet import Worksheet
 from sync_confluence.testspec._model import SheetTable, TestSpecError
 
 
+def _datetime_text(cell_value: datetime.datetime) -> str:
+    """Date-only cells come back as midnight datetimes; keep any real time."""
+    if cell_value.time() == datetime.time.min:
+        return cell_value.date().isoformat()
+    return cell_value.isoformat(sep=" ")
+
+
 def cell_text(cell_value: Any) -> str:
     """Render a cell value as the text a reader of the sheet would expect."""
     if cell_value is None:
@@ -20,7 +27,7 @@ def cell_text(cell_value: Any) -> str:
     if isinstance(cell_value, float) and cell_value.is_integer():
         return str(int(cell_value))
     if isinstance(cell_value, datetime.datetime):
-        return cell_value.date().isoformat()
+        return _datetime_text(cell_value)
     return str(cell_value).replace("\xa0", " ").rstrip()
 
 

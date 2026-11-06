@@ -82,6 +82,9 @@ def read_index(workbook: Workbook, sheet_name: str) -> list[TestCase]:
     if _TAGS.casefold() in (header.casefold() for header in index.headers):
         cols[_TAGS] = column_index(index, _TAGS, sheet_name)
     _check_test_id_is_text(workbook, sheet_name, cols[_TEST_ID])
+    if not index.rows:
+        # An empty sync would make orphan cleanup delete every published case.
+        raise TestSpecError(f"Sheet '{sheet_name}' has no test cases")
     cases = [_parse_index_row(row, cols) for row in index.rows]
     _check_unique_ids(cases)
     return cases

@@ -24,6 +24,11 @@ def _run_orphan_cleanup(
     if parent_id == DRY_RUN_PAGE_ID:
         log.info("[DRY-RUN] Skipping orphan check — parent page does not exist yet")
         return 0
+    if sync_result.skipped:
+        # A skipped page may have moved; its old copy is then absent from the
+        # expected sets and would be deleted although it is the only one left.
+        log.warning("Skipping orphan cleanup because some pages were skipped")
+        return 0
     if not session.managed_by_label:
         log.warning(
             "No managed-by label is set — orphan cleanup will target ALL "

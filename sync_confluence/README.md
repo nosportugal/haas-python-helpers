@@ -116,7 +116,7 @@ CLI flags take precedence over environment variables. Required flags must be sup
 - `--no-generated-by`: Suppress the auto-generated banner panel
 - `--page-width` / `CONFLUENCE_PAGE_WIDTH`: Set display width for every synced page.
   `full-width` renders content across the full browser width; `default` uses the standard Confluence narrow layout.
-  Omit to leave page widths unchanged
+  Omit to leave page widths unchanged. Invalid values are rejected, including from the environment variable
 - `--dry-run`: Preview pages that would be created, updated, or deleted without making any API calls
 - `--log-level` / `LOG_LEVEL`: Logging verbosity — `DEBUG`, `INFO`, `WARNING`, `ERROR` (default: `INFO`)
 
@@ -161,6 +161,7 @@ Workbook layout (headers are matched case-insensitively; the first non-empty row
 | `<id> - Outputs`        | `JSON`, plus any extra columns (e.g. `CLI`)                           | One row per expected JSON document; multi-line cells. `JSON` must be valid and is pretty-printed                               |
 
 Missing `Inputs`/`Outputs` sheets render as "Not specified yet."; sheets that match no `Test ID` fail the run.
+An `Index` without test cases and `Inputs` rows with a blank `Parameter` also fail the run.
 The workbook is fully validated before any Confluence call.
 
 Each page is titled `<id> - <name> (<vendor>)` and contains Vendor, Type and Tags, the
@@ -174,7 +175,9 @@ Labels are added, never removed, when tags change.
 - `--xlsx` / `TESTSPEC_XLSX`: Path to the workbook — **required**
 
 Orphan cleanup works as for Markdown sync: managed pages and vendor folders under `--parent-id`
-that are no longer in the workbook are **permanently deleted**.
+that are no longer in the workbook are **permanently deleted**. In both commands cleanup is
+skipped for the whole run when any page was skipped (title collision), so a page that could not
+be moved is never deleted.
 
 ## Deprecated aliases
 

@@ -23,8 +23,12 @@ def _inputs_by_parameter(inputs: SheetTable, sheet_name: str) -> dict[str, list[
     param_col = column_index(inputs, PARAMETER_COLUMN, sheet_name)
     column_index(inputs, VALUE_COLUMN, sheet_name)
     by_name: dict[str, list[str]] = {}
-    for row in inputs.rows:
+    for row_number, row in enumerate(inputs.rows, start=1):
         name = row[param_col].strip()
+        if not name:
+            raise TestSpecError(
+                f"Sheet '{sheet_name}' data row {row_number}: blank Parameter name"
+            )
         if name in by_name:
             raise TestSpecError(f"Sheet '{sheet_name}': duplicate parameter '{name}'")
         by_name[name] = _without(row, param_col)
@@ -32,10 +36,12 @@ def _inputs_by_parameter(inputs: SheetTable, sheet_name: str) -> dict[str, list[
 
 
 def _check_known(by_name: dict, catalog_names: set[str], sheet_name: str) -> None:
-    unknown = ", ".join(sorted(set(by_name) - catalog_names))
+    unknown = sorted(set(by_name) - catalog_names)
     if unknown:
+        unknown_text = ", ".join(unknown)
         raise TestSpecError(
-            f"Sheet '{sheet_name}': parameters not in the Parameters sheet: {unknown}"
+            f"Sheet '{sheet_name}': parameters not in the Parameters sheet: "
+            f"{unknown_text}"
         )
 
 

@@ -6,6 +6,24 @@ import argparse
 
 from sync_confluence.confluence.sync_cli._env_defaults import env_or_default
 
+PAGE_WIDTHS = ("full-width", "default")
+
+
+def page_width_value(raw_width: str) -> str:
+    """Validate a ``--page-width`` value.
+
+    Used as argparse ``type=`` because argparse checks ``choices`` only for
+    values typed on the command line, but runs ``type=`` on string defaults
+    too, so an invalid ``CONFLUENCE_PAGE_WIDTH`` is rejected as well.
+    """
+    if raw_width not in PAGE_WIDTHS:
+        valid = ", ".join(PAGE_WIDTHS)
+        raise argparse.ArgumentTypeError(
+            f"invalid page width {raw_width!r} (valid: {valid}; "
+            "also checked for CONFLUENCE_PAGE_WIDTH)"
+        )
+    return raw_width
+
 
 def add_confluence_connection_args(parser: argparse.ArgumentParser) -> None:
     """Add the Confluence connection options (url, email, token, space, parent id)."""
@@ -58,7 +76,8 @@ def add_page_metadata_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--page-width",
         default=env_or_default("CONFLUENCE_PAGE_WIDTH"),
-        choices=["full-width", "default"],
+        type=page_width_value,
+        choices=PAGE_WIDTHS,
         help=(
             "Display width for every synced page. "
             "'full-width' renders content across the full browser width; "

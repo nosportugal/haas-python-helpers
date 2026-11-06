@@ -140,10 +140,3 @@ def validate_args(args: argparse.Namespace) -> None:
     if args.docs_dir and getattr(args, "docs_files", None):
         log.error("--docs-dir and --docs-files are mutually exclusive.")
         sys.exit(2)
-
-    if args.page_width not in (None, "full-width", "default"):
-        log.error(
-            "Invalid --page-width '%s'; valid values: full-width, default",
-            args.page_width,
-        )
-        sys.exit(2)

@@ -185,7 +185,10 @@ Orphan cleanup only considers pages and vendor folders of the **same suite** (st
 `testspec/<suite>/…`): those under `--parent-id` that are no longer in the workbook are
 **permanently deleted**, while other workbooks synced to the same parent are left alone.
 If a vendor folder title already exists elsewhere in the space, the run fails without cleanup
-instead of publishing under the other parent. In both commands cleanup is
+instead of publishing under the other parent. An existing vendor folder under `--parent-id` is
+only reused when it already carries the managed-by label; a folder someone created by hand with
+the same title fails the run instead of being adopted (and later becoming eligible for deletion).
+Add the label to the folder to adopt it deliberately. In both commands cleanup is
 skipped for the whole run when any page was skipped (title collision), so a page that could not
 be moved is never deleted.
 

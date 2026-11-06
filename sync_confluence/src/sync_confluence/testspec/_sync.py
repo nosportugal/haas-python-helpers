@@ -17,7 +17,7 @@ from sync_confluence.confluence import (
     PageSyncAction,
     PageUpsertRequest,
     build_source_path_map,
-    find_folder_under_parent,
+    find_owned_folder,
     upsert_folder,
     upsert_page,
 )
@@ -49,26 +49,22 @@ def _group_by_vendor(cases: list[TestCase]) -> dict[str, list[TestCase]]:
 def _upsert_vendor_folder(
     confluence: Confluence, vendor: str, config: TestSpecSyncConfig
 ) -> str:
-    title = vendor_folder_title(vendor, config.suite)
+    request = FolderUpsertRequest(
+        space_key=config.space_key,
+        parent_id=config.parent_id,
+        title=vendor_folder_title(vendor, config.suite),
+        dry_run=config.dry_run,
+        managed_by_label=config.managed_by_label,
+        source_path=vendor_source_path(vendor, config.suite),
+        require_ownership=True,
+    )
     if config.dry_run:
         # upsert_folder returns a placeholder id in dry-run, which would make
         # every existing page look new; use the real folder when there is one.
-        existing = find_folder_under_parent(
-            confluence, config.space_key, title, config.parent_id
-        )
-        if existing:
-            return existing["id"]
-    folder_id, _ = upsert_folder(
-        confluence,
-        FolderUpsertRequest(
-            space_key=config.space_key,
-            parent_id=config.parent_id,
-            title=title,
-            dry_run=config.dry_run,
-            managed_by_label=config.managed_by_label,
-            source_path=vendor_source_path(vendor, config.suite),
-        ),
-    )
+        existing_id = find_owned_folder(confluence, request)
+        if existing_id:
+            return existing_id
+    folder_id, _ = upsert_folder(confluence, request)
     return folder_id
 
 

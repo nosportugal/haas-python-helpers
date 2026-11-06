@@ -36,6 +36,9 @@ class FolderUpsertRequest:
     dry_run: bool = False
     managed_by_label: Optional[str] = None
     source_path: Optional[str] = None
+    # When set, an existing folder is reused only if it already carries
+    # managed_by_label (see ensure_folder_owned).
+    require_ownership: bool = False
 
 
 @dataclass

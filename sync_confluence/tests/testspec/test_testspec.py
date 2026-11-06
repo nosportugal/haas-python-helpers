@@ -10,7 +10,7 @@ import openpyxl
 import pytest
 from lxml import etree
 
-from sync_confluence.confluence import FolderConflictError
+from sync_confluence.confluence import FolderConflictError, FolderNotOwnedError
 from sync_confluence.confluence._page_metadata import _apply_page_metadata
 from sync_confluence.confluence._types import PageUpsertRequest
 from sync_confluence.confluence.sync_cli import new_sync_result
@@ -355,7 +355,10 @@ class TestSyncTestCases:
         "sync_confluence.testspec._sync.upsert_folder",
         return_value=("DRY-RUN", "created"),
     )
-    @patch("sync_confluence.testspec._sync.find_folder_under_parent", return_value=None)
+    @patch(
+        "sync_confluence.confluence._folder_ownership.find_folder_under_parent",
+        return_value=None,
+    )
     def test_skipped_pages_are_reported_and_dry_run_skips_path_map(
         self,
         mock_find: MagicMock,
@@ -382,7 +385,7 @@ class TestSyncTestCases:
     @patch("sync_confluence.testspec._sync.upsert_page", return_value=("7", "updated"))
     @patch("sync_confluence.testspec._sync.upsert_folder")
     @patch(
-        "sync_confluence.testspec._sync.find_folder_under_parent",
+        "sync_confluence.confluence._folder_ownership.find_folder_under_parent",
         return_value={"id": "f-cisco"},
     )
     def test_dry_run_uses_existing_vendor_folder_for_page_lookups(
@@ -407,6 +410,54 @@ class TestSyncTestCases:
         assert mock_page.call_args.args[1].parent_id == "f-cisco"
         assert mock_path_map.call_args.args[1] == "f-cisco"
         assert result.stats["updated"] == 1
+
+    @patch(
+        "sync_confluence.confluence._folder_ownership._page_has_label",
+        return_value=False,
+    )
+    @patch("sync_confluence.testspec._sync.upsert_page")
+    @patch(
+        "sync_confluence.confluence._folder_ownership.find_folder_under_parent",
+        return_value={"id": "f-user"},
+    )
+    def test_dry_run_refuses_unowned_vendor_folder(
+        self,
+        mock_find: MagicMock,
+        mock_page: MagicMock,
+        mock_has_label: MagicMock,
+    ) -> None:
+        config = TestSpecSyncConfig(
+            space_key="HaaS",
+            parent_id="100",
+            source_file=Path("spec.xlsx"),
+            suite="L3VPN",
+            dry_run=True,
+            managed_by_label="managed-by-repo-testspec",
+        )
+
+        with pytest.raises(FolderNotOwnedError, match="f-user"):
+            sync_test_cases(MagicMock(), [_case("1.1", "Cisco")], config)
+
+        mock_page.assert_not_called()
+
+    @patch("sync_confluence.testspec._sync.build_source_path_map", return_value={})
+    @patch("sync_confluence.testspec._sync.upsert_page", return_value=("p", "created"))
+    @patch(
+        "sync_confluence.testspec._sync.upsert_folder", return_value=("f", "created")
+    )
+    def test_vendor_folders_require_ownership(
+        self, mock_folder: MagicMock, mock_page: MagicMock, mock_map: MagicMock
+    ) -> None:
+        config = TestSpecSyncConfig(
+            space_key="HaaS",
+            parent_id="100",
+            source_file=Path("spec.xlsx"),
+            suite="L3VPN",
+        )
+
+        sync_test_cases(MagicMock(), [_case("1.1", "Cisco")], config)
+
+        assert mock_folder.call_args.args[1].require_ownership is True
 
 
 @patch("sync_confluence.confluence._page_metadata._apply_label")

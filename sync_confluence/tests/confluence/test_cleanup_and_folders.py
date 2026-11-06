@@ -9,9 +9,12 @@ from requests import HTTPError, Response
 from sync_confluence.confluence import (
     DeleteOrphansRequest,
     FolderConflictError,
+    FolderNotOwnedError,
     FolderUpsertRequest,
     PageSyncAction,
     delete_orphans,
+    ensure_folder_owned,
+    upsert_folder,
 )
 from sync_confluence.confluence._folder_create import _create_folder_with_fallback
 from sync_confluence.confluence.sync_cli import resolve_managed_by_label
@@ -136,3 +139,80 @@ def test_label_suffix_applies_only_to_derived_label(
     label = resolve_managed_by_label(args, "https://github.com/org/repo", "-testspec")
 
     assert label == expected
+
+
+_FOLDER_UPSERT = "sync_confluence.confluence._folder_upsert"
+_OWNERSHIP = "sync_confluence.confluence._folder_ownership"
+
+
+def _owned_request(require_ownership: bool = True) -> FolderUpsertRequest:
+    return FolderUpsertRequest(
+        space_key="HaaS",
+        parent_id="100",
+        title="Cisco (L3VPN)",
+        managed_by_label="managed-by-repo-testspec",
+        require_ownership=require_ownership,
+    )
+
+
+@patch(f"{_FOLDER_UPSERT}._try_property_set")
+@patch(f"{_FOLDER_UPSERT}._apply_label")
+@patch(f"{_OWNERSHIP}._page_has_label", return_value=False)
+@patch(f"{_FOLDER_UPSERT}.find_folder_under_parent", return_value={"id": "7"})
+def test_upsert_folder_refuses_unlabelled_existing_folder(
+    mock_find: MagicMock,
+    mock_has_label: MagicMock,
+    mock_apply: MagicMock,
+    mock_property: MagicMock,
+) -> None:
+    with pytest.raises(FolderNotOwnedError, match="has no 'managed-by-repo-testspec'"):
+        upsert_folder(MagicMock(), _owned_request())
+
+    mock_apply.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("require_ownership", "has_label"), [(True, True), (False, False)]
+)
+@patch(f"{_FOLDER_UPSERT}._try_property_set")
+@patch(f"{_FOLDER_UPSERT}._apply_label")
+@patch(f"{_OWNERSHIP}._page_has_label")
+@patch(f"{_FOLDER_UPSERT}.find_folder_under_parent", return_value={"id": "7"})
+def test_upsert_folder_reuses_owned_or_unchecked_folder(
+    mock_find: MagicMock,
+    mock_has_label: MagicMock,
+    mock_apply: MagicMock,
+    mock_property: MagicMock,
+    require_ownership: bool,
+    has_label: bool,
+) -> None:
+    mock_has_label.return_value = has_label
+
+    folder = upsert_folder(MagicMock(), _owned_request(require_ownership))
+
+    assert folder == ("7", PageSyncAction.UNCHANGED)
+    mock_apply.assert_called_once()
+
+
+@patch(f"{_OWNERSHIP}._page_has_label", return_value=False)
+@patch(f"{_FOLDER_FALLBACK}._find_folder_by_space_cql", return_value="55")
+def test_fallback_refuses_unlabelled_folder_under_the_parent(
+    mock_cql: MagicMock, mock_has_label: MagicMock
+) -> None:
+    confluence = MagicMock()
+    confluence.post.side_effect = _folder_exists_error()
+    confluence.get.return_value = {"id": "55", "ancestors": [{"id": "100"}]}
+
+    with pytest.raises(FolderNotOwnedError):
+        _create_folder_with_fallback(confluence, _owned_request())
+
+
+def test_ownership_is_not_checked_without_a_label() -> None:
+    confluence = MagicMock()
+    request = FolderUpsertRequest(
+        space_key="HaaS", parent_id="100", title="X", require_ownership=True
+    )
+
+    ensure_folder_owned(confluence, "7", request)
+
+    confluence.get.assert_not_called()

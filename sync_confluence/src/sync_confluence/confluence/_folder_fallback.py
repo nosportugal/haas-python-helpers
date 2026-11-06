@@ -13,6 +13,7 @@ from atlassian import Confluence
 
 from sync_confluence.confluence._constants import PageSyncAction, _Keys
 from sync_confluence.confluence._errors import FolderConflictError
+from sync_confluence.confluence._folder_ownership import ensure_folder_owned
 from sync_confluence.confluence._logging import log
 from sync_confluence.confluence._lookup import _find_folder_by_space_cql
 from sync_confluence.confluence._types import FolderUpsertRequest
@@ -53,6 +54,7 @@ def _reuse_fallback_folder(
             f"under parent {request.parent_id}. Titles are unique per space: "
             "rename or move the existing folder."
         )
+    ensure_folder_owned(confluence, fallback_id, request)
     log.info("Found existing folder '%s' via CQL (id=%s)", request.title, fallback_id)
     return (fallback_id, PageSyncAction.UNCHANGED)
 

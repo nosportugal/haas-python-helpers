@@ -13,6 +13,7 @@ from sync_confluence.confluence._folder_create import (
     _create_folder_with_fallback,
     _upsert_folder_dry_run,
 )
+from sync_confluence.confluence._folder_ownership import ensure_folder_owned
 from sync_confluence.confluence._logging import log
 from sync_confluence.confluence._lookup import find_folder_under_parent
 from sync_confluence.confluence._properties import _apply_label, _try_property_set
@@ -22,6 +23,7 @@ from sync_confluence.confluence._types import FolderUpsertRequest
 def _refresh_existing_folder(
     confluence: Confluence, request: FolderUpsertRequest, existing_id: str
 ) -> tuple[str, str]:
+    ensure_folder_owned(confluence, existing_id, request)
     log.debug("Unchanged folder: '%s' (id=%s)", request.title, existing_id)
     # Re-apply label so it is self-healing if it was ever missing.
     if request.managed_by_label:

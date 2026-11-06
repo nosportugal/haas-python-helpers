@@ -67,7 +67,9 @@ def _page_request(
         space_key=config.space_key,
         parent_id=folder_id,
         title=case.page_title(config.suite),
-        body=render_test_case(case, config.source_file, config.generated_by),
+        body=render_test_case(
+            case, config.source_file, config.generated_by, config.reformat_json
+        ),
         dry_run=config.dry_run,
         managed_by_label=config.managed_by_label,
         restrict_edits_to=config.restrict_edits_to,

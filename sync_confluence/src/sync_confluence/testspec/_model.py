@@ -70,3 +70,4 @@ class TestSpecSyncConfig:
     restrict_edits_to: Optional[str] = None
     page_width: Optional[str] = None
     generated_by: Optional[str] = None
+    reformat_json: bool = False

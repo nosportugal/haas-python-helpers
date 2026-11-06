@@ -49,6 +49,7 @@ def _sync_config(
         restrict_edits_to=auth.restrict_edits_to,
         page_width=args.page_width,
         generated_by="" if args.no_generated_by else args.generated_by,
+        reformat_json=args.format_json,
     )
 
 

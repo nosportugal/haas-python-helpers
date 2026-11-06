@@ -19,6 +19,7 @@ from sync_confluence.testspec import (
     TestSpecError,
     TestSpecSyncConfig,
     page_labels,
+    parse_testspec_sync_args,
     read_workbook,
     render_test_case,
     run_testspec_sync,
@@ -26,6 +27,8 @@ from sync_confluence.testspec import (
 )
 from sync_confluence.testspec._args import resolve_suite
 from sync_confluence.testspec._sync import _sort_key
+
+_MACRO = "{http://atlassian.com/content}structured-macro"
 
 # Mandatory columns (ID, Name, Description, Tags) plus two additional ones.
 INDEX_HEADERS = ["ID", "Name", "Vendor", "Description", "Tags", "Priority"]
@@ -354,6 +357,14 @@ class TestReadWorkbook:
 
 class TestRenderTestCase:
     @staticmethod
+    def _macro_body(macro: etree._Element) -> str:
+        return macro.findtext("{http://atlassian.com/content}plain-text-body")
+
+    @staticmethod
+    def _macro_language(macro: etree._Element) -> str:
+        return macro.findtext("{http://atlassian.com/content}parameter")
+
+    @staticmethod
     def _rows(table: etree._Element) -> list[list[str]]:
         """Cell text of every row, line breaks collapsed to a space."""
         return [
@@ -417,9 +428,7 @@ class TestRenderTestCase:
         assert notes.find("strong").tail == " first"
         assert notes.find("br").tail == "second"
 
-    def test_tables_render_as_written_with_no_special_columns(
-        self, workbook_path: Path
-    ) -> None:
+    def test_tables_render_as_written(self, workbook_path: Path) -> None:
         root = self._render(workbook_path, 0, generated_by="")
         inputs, outputs = root.findall("table")
 
@@ -428,11 +437,16 @@ class TestRenderTestCase:
             ["mtu", "integer", "9000"],
             ["vrfName", "string", "A"],
         ]
-        assert self._rows(outputs) == [
-            ["Target", "CLI", "JSON"],
-            ["/vrfs", "vrf A address-family ipv4", '{"vrf-name":"A"}'],
-        ]
-        assert not list(root.iter("{http://atlassian.com/content}structured-macro"))
+        assert self._rows(outputs)[0] == ["Target", "CLI", "JSON"]
+        assert self._rows(outputs)[1][:2] == ["/vrfs", "vrf A address-family ipv4"]
+
+    def test_only_json_columns_become_code_blocks(self, workbook_path: Path) -> None:
+        root = self._render(workbook_path, 0, generated_by="")
+
+        assert not list(root.findall("table")[0].iter(_MACRO))
+        macros = list(root.findall("table")[1].iter(_MACRO))
+        assert [self._macro_body(m) for m in macros] == ['{"vrf-name":"A"}']
+        assert [self._macro_language(m) for m in macros] == ["json"]
 
     def test_multiline_cells_keep_their_line_breaks(self, workbook_path: Path) -> None:
         outputs = self._render(workbook_path, 0).findall("table")[1]
@@ -704,6 +718,7 @@ def _run_args(workbook_path: Path) -> argparse.Namespace:
         page_width=None,
         generated_by=None,
         no_generated_by=False,
+        format_json=False,
     )
 
 
@@ -744,3 +759,113 @@ class TestRunTestspecSync:
         assert run_testspec_sync(_run_args(workbook_path)) == 1
 
         mock_finalise.assert_not_called()
+
+
+def _render_json_table(
+    cells: list[str], header: str = "JSON", reformat: bool = False
+) -> etree._Element:
+    case = _case("1.1")
+    case.outputs = SheetTable(headers=[header], rows=[[cell] for cell in cells])
+    body = render_test_case(case, Path("spec.xlsx"), "", reformat_json=reformat)
+    root = etree.fromstring(
+        f'<root xmlns:ac="http://atlassian.com/content">{body}</root>'
+    )
+    return root.find("table")
+
+
+def _bodies(table: etree._Element) -> list[str]:
+    return [
+        m.findtext("{http://atlassian.com/content}plain-text-body")
+        for m in table.iter(_MACRO)
+    ]
+
+
+class TestJsonColumns:
+    PRETTY = '{\n  "a": 1\n}'
+
+    @pytest.mark.parametrize("header", ["JSON", "json", " Json "])
+    def test_header_is_matched_ignoring_case_and_spaces(self, header: str) -> None:
+        table = _render_json_table(['{"a":1}'], header=header)
+
+        assert _bodies(table) == ['{"a":1}']
+
+    def test_other_headers_are_plain_text(self) -> None:
+        table = _render_json_table(['{"a":1}'], header="Response")
+
+        assert _bodies(table) == []
+        assert "".join(table.findall(".//td")[0].itertext()) == '{"a":1}'
+
+    def test_text_is_kept_as_written_by_default(self) -> None:
+        written = '{"b":1,   "a":[1,2]}'
+
+        assert _bodies(_render_json_table([written])) == [written]
+
+    @pytest.mark.parametrize(
+        "invalid",
+        ['"items": [ {"sku": "A"} ]', '{"a": 1, ...}', '{"a":1}\n{"b":2}', "n/a"],
+    )
+    def test_invalid_json_is_shown_unchanged_and_logged(
+        self, invalid: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level("WARNING"):
+            table = _render_json_table(["{}", invalid], reformat=True)
+
+        assert _bodies(table) == ["{}", invalid]
+        (record,) = caplog.records
+        assert "Sheet '1.1 - Outputs' data row 2: not valid JSON" in record.message
+
+    def test_valid_json_does_not_warn(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level("WARNING"):
+            _render_json_table(['{"a":1}', "9000"])
+
+        assert not caplog.records
+
+    def test_empty_cells_are_not_code_blocks(self) -> None:
+        table = _render_json_table(["", '{"a":1}'])
+
+        assert _bodies(table) == ['{"a":1}']
+
+    def test_reformat_pretty_prints_valid_json_only(self) -> None:
+        table = _render_json_table(['{"a":1}', "not json"], reformat=True)
+
+        assert _bodies(table) == [self.PRETTY, "not json"]
+
+    def test_reformat_keeps_unicode_and_big_numbers(self) -> None:
+        table = _render_json_table(
+            ['{"n": 12345678901234567890, "u": "caf\\u00e9"}'], reformat=True
+        )
+
+        assert _bodies(table) == [
+            '{\n  "n": 12345678901234567890,\n  "u": "caf\u00e9"\n}'
+        ]
+
+    def test_reformat_drops_duplicate_keys_which_is_why_it_is_opt_in(self) -> None:
+        table = _render_json_table(['{"d": 1, "d": 2}'], reformat=True)
+
+        assert _bodies(table) == ['{\n  "d": 2\n}']
+
+    def test_flag_and_env_turn_reformatting_on(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("TESTSPEC_FORMAT_JSON", raising=False)
+        assert parse_testspec_sync_args([]).format_json is False
+        assert parse_testspec_sync_args(["--format-json"]).format_json is True
+        monkeypatch.setenv("TESTSPEC_FORMAT_JSON", "true")
+        assert parse_testspec_sync_args([]).format_json is True
+        monkeypatch.setenv("TESTSPEC_FORMAT_JSON", "no")
+        assert parse_testspec_sync_args([]).format_json is False
+
+    @patch("sync_confluence.testspec._sync.build_source_path_map", return_value={})
+    @patch("sync_confluence.testspec._sync.upsert_page", return_value=("p", "created"))
+    @patch(
+        "sync_confluence.testspec._sync.upsert_folder", return_value=("f", "created")
+    )
+    def test_sync_passes_the_setting_to_the_page_body(
+        self, mock_folder: MagicMock, mock_page: MagicMock, mock_map: MagicMock
+    ) -> None:
+        case = _case("1.1")
+        case.outputs = SheetTable(headers=["JSON"], rows=[['{"a":1}']])
+
+        sync_test_cases(MagicMock(), [case], _config(reformat_json=True))
+
+        assert self.PRETTY in mock_page.call_args.args[1].body

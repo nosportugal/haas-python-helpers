@@ -13,6 +13,7 @@ from sync_confluence.confluence.sync_cli import (
 )
 from sync_confluence.testspec._model import TestSpecError
 
+_TRUTHY_ENV_VALUES = ("1", "true", "yes")
 REQUIRED_ARGS = (
     ("url", "--url / CONFLUENCE_URL"),
     ("email", "--email / CONFLUENCE_EMAIL"),
@@ -42,6 +43,18 @@ def parse_testspec_sync_args(argv: Optional[list[str]] = None) -> argparse.Names
             "unique per space) and used to scope orphan cleanup to this "
             "workbook's pages. Defaults to the workbook file name without "
             "extension (env: TESTSPEC_SUITE)."
+        ),
+    )
+    parser.add_argument(
+        "--format-json",
+        action="store_true",
+        default=(env_or_default("TESTSPEC_FORMAT_JSON") or "").casefold()
+        in _TRUTHY_ENV_VALUES,
+        help=(
+            "Pretty-print valid JSON in columns headed 'JSON'. Off by default "
+            "because reformatting can change a cell (duplicate keys are "
+            "dropped, 1.50 becomes 1.5). Invalid JSON is always shown "
+            "unchanged (env: TESTSPEC_FORMAT_JSON=true)."
         ),
     )
     parser.add_argument(

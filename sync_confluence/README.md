@@ -172,9 +172,19 @@ No other sheet is allowed (see [Rejected sheets](#rejected-sheets)).
 writes the test cases decides what they hold, for example a column of full JSON documents, a
 column of partial JSON, or a `Parameter | Value` table. The tool only renders the table as
 written: the first row is the header, every following row is a row, and line breaks inside a
-cell are kept. Cell text is shown as plain text, so indentation inside a cell is not preserved.
-Empty columns at the right are dropped; a column that holds data is always kept, even if its
-header is blank.
+cell are kept. Empty columns at the right are dropped; a column that holds data is always kept,
+even if its header is blank.
+
+The only column name with a meaning is **`JSON`** (any case), in `Inputs` and `Outputs`: its
+cells are shown in a JSON code block, so indentation and line breaks are kept. The text is shown
+**as written** and a cell is never rejected: a fragment, a placeholder or several documents are
+shown unchanged, and each cell that is not valid JSON is logged as a warning. Every other column is
+plain text, where indentation inside a cell is not preserved.
+
+With `--format-json` (`TESTSPEC_FORMAT_JSON=true`), valid JSON cells are pretty-printed. This is
+off by default because it can change a cell: a duplicate key is dropped (`{"d":1,"d":2}` becomes
+`{"d": 2}`), `1.50` becomes `1.5`, and any hand-made layout is lost. Key order, big integers and
+non-ASCII characters are kept.
 
 #### Index sheet
 
@@ -235,6 +245,7 @@ Labels are added, never removed, when tags change.
 `--page-width`, `--generated-by` and `--no-generated-by` options described above, plus:
 
 - `--xlsx` / `TESTSPEC_XLSX`: Path to the workbook — **required**
+- `--format-json` / `TESTSPEC_FORMAT_JSON`: Pretty-print valid JSON in `JSON` columns (default: off, text shown as written)
 - `--suite` / `TESTSPEC_SUITE`: Suite name used in titles and to scope cleanup (default: workbook file name without extension). Must not contain `/`
 
 The default managed-by label is `managed-by-<repo>-testspec`, separate from the Markdown sync's

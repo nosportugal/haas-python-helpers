@@ -4,7 +4,7 @@ Public surface:
 
 - :func:`read_workbook` — parse and validate a workbook into :class:`TestCase` objects.
 - :func:`render_test_case` — render one test case as a CSF page body.
-- :func:`sync_test_cases` — publish test cases (one folder per vendor).
+- :func:`sync_test_cases` — publish test cases (one folder per suite).
 - :func:`testspec_sync_main` — ``sync-confluence-testspec`` entry point.
 - :func:`run_testspec_sync`, :func:`parse_testspec_sync_args` — run / parse args.
 """

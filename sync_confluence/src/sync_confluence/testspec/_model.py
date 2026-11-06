@@ -30,30 +30,29 @@ class TestCase:
     test_id: str
     name: str
     description: str
-    test_type: str
-    vendor: str
     tags: list[str] = field(default_factory=list)
+    # Additional Index columns as (header, value), in table order.
+    extra_fields: list[tuple[str, str]] = field(default_factory=list)
     inputs: Optional[SheetTable] = None
     outputs: Optional[SheetTable] = None
 
     def page_title(self, suite: str) -> str:
         """Space-unique page title; *suite* keeps workbooks from colliding."""
-        return f"{self.test_id} - {self.name} ({self.vendor}, {suite})"
+        return f"{self.test_id} - {self.name} ({suite})"
 
-
-def vendor_folder_title(vendor: str, suite: str) -> str:
-    """Space-unique title of the folder holding one vendor's tests of *suite*."""
-    return f"{vendor} ({suite})"
+    def source_path(self, suite: str) -> str:
+        """Stable identity of the page: ``testspec/<suite>/<test id>``."""
+        return f"{suite_source_prefix(suite)}{self.test_id}"
 
 
 def suite_source_prefix(suite: str) -> str:
-    """Source-path prefix of every folder and page published for *suite*."""
+    """Source-path prefix of every page published for *suite*."""
     return f"testspec/{suite}/"
 
 
-def vendor_source_path(vendor: str, suite: str) -> str:
-    """Source path of a vendor folder; its pages append ``/<test id>``."""
-    return f"{suite_source_prefix(suite)}{vendor}"
+def suite_source_path(suite: str) -> str:
+    """Source path of the suite folder that holds the pages of *suite*."""
+    return f"testspec/{suite}"
 
 
 @dataclass

@@ -10,9 +10,9 @@ _LABEL_INVALID_RE = re.compile(r"[^a-z0-9_-]+")
 
 
 def page_labels(case: TestCase) -> list[str]:
-    """Vendor, type and tags as Confluence-safe labels (lowercase, no spaces)."""
+    """Tags as Confluence-safe labels (lowercase, no spaces, no duplicates)."""
     labels: list[str] = []
-    for raw in (case.vendor, case.test_type, *case.tags):
+    for raw in case.tags:
         label = _LABEL_INVALID_RE.sub("-", raw.casefold()).strip("-")
         if label and label not in labels:
             labels.append(label)

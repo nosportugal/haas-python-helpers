@@ -18,17 +18,22 @@ from sync_confluence.testspec._csf_table import (
 )
 from sync_confluence.testspec._model import TestCase
 
+_EMPTY_VALUE = "-"
+
 
 def _labelled(parent: ElementType, label: str, text: str) -> None:
     paragraph = sub_element(parent, "p")
-    sub_element(paragraph, "strong", f"{label}:").tail = f" {text}"
+    lines = (text or _EMPTY_VALUE).split("\n")
+    sub_element(paragraph, "strong", f"{label}:").tail = f" {lines[0]}"
+    for line in lines[1:]:
+        sub_element(paragraph, "br").tail = line
 
 
 def _details(root: ElementType, case: TestCase) -> None:
-    _labelled(root, "Vendor", case.vendor)
-    _labelled(root, "Type", case.test_type)
-    if case.tags:
-        _labelled(root, "Tags", ", ".join(case.tags))
+    """Tags first, then the additional Index columns in table order."""
+    _labelled(root, "Tags", ", ".join(case.tags))
+    for label, field_text in case.extra_fields:
+        _labelled(root, label, field_text)
     sub_element(root, "h2", "Description")
     for paragraph in case.description.split("\n\n"):
         set_multiline(sub_element(root, "p"), paragraph.strip())

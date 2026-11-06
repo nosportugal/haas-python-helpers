@@ -1,4 +1,4 @@
-"""Push test cases to Confluence: one folder per vendor, one page per test.
+"""Push test cases to Confluence: one folder per suite, one page per test.
 
 Confluence titles are unique per space, so folder and page titles carry the
 suite name, and every source path starts with ``testspec/<suite>/`` so that
@@ -26,36 +26,25 @@ from sync_confluence.testspec._labels import page_labels
 from sync_confluence.testspec._model import (
     TestCase,
     TestSpecSyncConfig,
-    vendor_folder_title,
-    vendor_source_path,
+    suite_source_path,
 )
 from sync_confluence.testspec._render import render_test_case
 
 log = logging.getLogger(__name__)
 
 
-def _sort_key(case: TestCase) -> tuple[str, tuple[int, ...]]:
-    id_parts = tuple(int(part) for part in case.test_id.split("."))
-    return (case.vendor, id_parts)
+def _sort_key(case: TestCase) -> tuple[int, ...]:
+    return tuple(int(part) for part in case.test_id.split("."))
 
 
-def _group_by_vendor(cases: list[TestCase]) -> dict[str, list[TestCase]]:
-    groups: dict[str, list[TestCase]] = {}
-    for case in sorted(cases, key=_sort_key):
-        groups.setdefault(case.vendor, []).append(case)
-    return groups
-
-
-def _upsert_vendor_folder(
-    confluence: Confluence, vendor: str, config: TestSpecSyncConfig
-) -> str:
+def _upsert_suite_folder(confluence: Confluence, config: TestSpecSyncConfig) -> str:
     request = FolderUpsertRequest(
         space_key=config.space_key,
         parent_id=config.parent_id,
-        title=vendor_folder_title(vendor, config.suite),
+        title=config.suite,
         dry_run=config.dry_run,
         managed_by_label=config.managed_by_label,
-        source_path=vendor_source_path(vendor, config.suite),
+        source_path=suite_source_path(config.suite),
         require_ownership=True,
     )
     if config.dry_run:
@@ -82,7 +71,7 @@ def _page_request(
         dry_run=config.dry_run,
         managed_by_label=config.managed_by_label,
         restrict_edits_to=config.restrict_edits_to,
-        source_path=f"{vendor_source_path(case.vendor, config.suite)}/{case.test_id}",
+        source_path=case.source_path(config.suite),
         source_path_map=path_map,
         page_width=config.page_width,
         labels=page_labels(case),
@@ -99,29 +88,18 @@ def _record(outcome: SyncResult, request: PageUpsertRequest, action: str) -> Non
     outcome.expected_paths.add(str(request.source_path))
 
 
-def _sync_vendor(
-    confluence: Confluence,
-    cases: list[TestCase],
-    config: TestSpecSyncConfig,
-    outcome: SyncResult,
-) -> None:
-    vendor = cases[0].vendor
-    folder_id = _upsert_vendor_folder(confluence, vendor, config)
-    outcome.expected_titles.add(vendor_folder_title(vendor, config.suite))
-    outcome.expected_paths.add(vendor_source_path(vendor, config.suite))
-    path_map = {}
-    if folder_id != DRY_RUN_PAGE_ID:
-        path_map = build_source_path_map(confluence, folder_id)
-    for case in cases:
-        request = _page_request(case, folder_id, path_map, config)
-        _record(outcome, request, upsert_page(confluence, request)[1])
-
-
 def sync_test_cases(
     confluence: Confluence, cases: list[TestCase], config: TestSpecSyncConfig
 ) -> SyncResult:
-    """Upsert a folder per vendor and a page per test case under the parent."""
+    """Upsert the suite folder and one page per test case directly under it."""
     outcome = new_sync_result()
-    for vendor_cases in _group_by_vendor(cases).values():
-        _sync_vendor(confluence, vendor_cases, config, outcome)
+    folder_id = _upsert_suite_folder(confluence, config)
+    outcome.expected_titles.add(config.suite)
+    outcome.expected_paths.add(suite_source_path(config.suite))
+    path_map = {}
+    if folder_id != DRY_RUN_PAGE_ID:
+        path_map = build_source_path_map(confluence, folder_id)
+    for case in sorted(cases, key=_sort_key):
+        request = _page_request(case, folder_id, path_map, config)
+        _record(outcome, request, upsert_page(confluence, request)[1])
     return outcome

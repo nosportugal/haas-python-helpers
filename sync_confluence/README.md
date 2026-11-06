@@ -142,33 +142,71 @@ A named container folder with the given title is found under `--parent-id` (or c
 
 ## Test specifications from Excel (`sync-confluence-testspec`)
 
-Publishes a test-specification workbook (`.xlsx`) as one Confluence page per test case,
-grouped in one folder per vendor under `--parent-id`. Requires the `xlsx` extra:
+Publishes a test-specification workbook (`.xlsx`) as one Confluence page per test case.
+All pages of a workbook are listed in one **suite folder** under `--parent-id`. Requires
+the `xlsx` extra:
 
 ```bash
 pip install "sync-confluence[xlsx] @ git+https://github.com/nosportugal/haas-python-helpers.git#subdirectory=sync_confluence"
 
-sync-confluence-testspec --xlsx "Testes serviço L3VPN - Cisco.xlsx" --space HaaS --parent-id 12345 --dry-run
+sync-confluence-testspec --xlsx testspec.xlsx --space HaaS --parent-id 12345 --dry-run
 ```
 
-Workbook layout (headers are matched case-insensitively; the first non-empty row of each sheet is the header row):
+A ready-made example that follows this format is in
+[`examples/testspec_format_example.xlsx`](examples/testspec_format_example.xlsx).
 
-| Sheet                   | Columns                                                               | Notes                                                                                                                          |
-| ----------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `Index`                 | `Test ID`, `Name`, `Description`, `Type`, `Vendor`, `Tags` (optional) | `Test ID` is `n.n` and must be formatted as Text. `Type` is `Create`, `Modify` or `Delete`. `Tags` are separated by `;` or `,` |
-| `Parameters` (optional) | `Parameter` plus any catalog columns (type, default, …)               | Every catalog parameter is listed on every test page                                                                           |
-| `<id> - Inputs`         | `Parameter`, `Value`, plus any extra columns                          | Parameters must exist in `Parameters` when that sheet is present                                                               |
-| `<id> - Outputs`        | `JSON`, plus any extra columns (e.g. `CLI`)                           | One row per expected JSON document; multi-line cells. `JSON` must be valid and is pretty-printed                               |
+### Workbook format
 
-Missing `Inputs`/`Outputs` sheets render as "Not specified yet."; sheets that match no `Test ID` fail the run.
-An `Index` without test cases and `Inputs` rows with a blank `Parameter` also fail the run.
-The workbook is fully validated before any Confluence call.
+The format is the same for any kind of test (unit, integration, E2E, ...). Headers are
+matched case-insensitively; the first non-empty row of each sheet is the header row.
 
-Confluence titles are unique per space, so titles carry a **suite** name (`--suite`, default: the
-workbook file name without extension). Vendor folders are titled `<vendor> (<suite>)`.
-Each page is titled `<id> - <name> (<vendor>, <suite>)` and contains Vendor, Type and Tags, the
-description, the Inputs table and the Outputs table (`CLI` and `JSON` cells as code
-macros). Vendor, type and tags are also applied as page labels.
+| Sheet                   | Required | Content                                                                                                  |
+| ----------------------- | -------- | -------------------------------------------------------------------------------------------------------- |
+| **First sheet**         | yes      | The **Index**: one row per test case. Its name is not significant                                        |
+| `Parameters`            | no       | `Parameter` plus any catalog columns (type, default, ...). Every parameter is listed on every test page  |
+| `<ID> - Inputs`         | no       | `Parameter`, `Value`, plus any extra columns. Parameters must exist in `Parameters` when it is present   |
+| `<ID> - Outputs`        | no       | `JSON`, plus any extra columns (e.g. `CLI`). One row per expected JSON document; `JSON` must be valid    |
+
+#### Index sheet
+
+The first sheet is always the Index. Its header row must contain these **mandatory
+columns**; a missing one fails the run:
+
+| Column        | Meaning                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------ |
+| `ID`          | Test identifier in `n.n` form (`1.1`, `2.10`), unique in the workbook. Format the column as **Text** so `1.10` is not read as `1.1` |
+| `Name`        | Short test name (required on every row)                                                                      |
+| `Description` | What the test checks; may be empty on a row. A blank line starts a new paragraph                             |
+| `Tags`        | Free-form tags separated by `;` or `,`; may be empty on a row. Tags are also applied as page labels         |
+
+Any **other column** is an additional column. Additional columns have no special meaning
+and no value rules: they are handled all alike, and their header is used as the field name
+on the page. Their position in the table sets their order on the page. Headers must not be
+blank or repeated.
+
+#### Page layout
+
+```text
+Tags: <tags>
+<additional column 1>: <value>
+<additional column 2>: <value>
+...
+Description
+Inputs
+Outputs
+```
+
+`Tags` is always the first field, then the additional columns in the order they appear in
+the Index table, then `Description`, `Inputs` and `Outputs`. Fields with no value show `-`.
+Missing `Inputs`/`Outputs` sheets render as "Not specified yet."; sheets that match no `ID`
+fail the run. An Index without test cases and `Inputs` rows with a blank `Parameter` also
+fail the run. The workbook is fully validated before any Confluence call.
+
+### Titles, folders and cleanup
+
+Confluence titles are unique per space, so titles carry a **suite** name (`--suite`, default:
+the workbook file name without extension; a naming rule for workbook files is still to be
+defined). The suite folder is titled `<suite>` and each page `<ID> - <Name> (<suite>)`.
 Labels are added, never removed, when tags change.
 
 `sync-confluence-testspec` accepts the connection, `--dry-run`, `--managed-by`, `--log-level`,
@@ -181,11 +219,11 @@ The default managed-by label is `managed-by-<repo>-testspec`, separate from the 
 `managed-by-<repo>`, so both commands can share a `--parent-id` without deleting each other's pages.
 An explicit `--managed-by` is used as given.
 
-Orphan cleanup only considers pages and vendor folders of the **same suite** (stored source path
-`testspec/<suite>/…`): those under `--parent-id` that are no longer in the workbook are
+Orphan cleanup only considers pages of the **same suite** (stored source path
+`testspec/<suite>/...`): those under `--parent-id` that are no longer in the workbook are
 **permanently deleted**, while other workbooks synced to the same parent are left alone.
-If a vendor folder title already exists elsewhere in the space, the run fails without cleanup
-instead of publishing under the other parent. An existing vendor folder under `--parent-id` is
+If the suite folder title already exists elsewhere in the space, the run fails without cleanup
+instead of publishing under the other parent. An existing suite folder under `--parent-id` is
 only reused when it already carries the managed-by label; a folder someone created by hand with
 the same title fails the run instead of being adopted (and later becoming eligible for deletion).
 Add the label to the folder to adopt it deliberately. In both commands cleanup is

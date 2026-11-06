@@ -102,9 +102,19 @@ class TestReadWorkbook:
     def test_example_workbook_shows_different_output_layouts(self) -> None:
         by_id = {case.test_id: case for case in read_workbook(_EXAMPLE)}
 
-        assert by_id["1.1"].outputs.headers == ["Response"]
+        assert by_id["1.1"].outputs.headers == ["JSON"]
         assert by_id["2.1"].outputs.headers == ["Parameter", "Value"]
         assert by_id["1.1.3"].outputs.headers == ["Check", "Expected (partial)"]
+
+    def test_example_workbook_json_column_is_the_only_code_block(self) -> None:
+        by_id = {case.test_id: case for case in read_workbook(_EXAMPLE)}
+
+        bodies = {
+            test_id: render_test_case(case, Path("x.xlsx"), "").count('ac:name="code"')
+            for test_id, case in by_id.items()
+        }
+
+        assert bodies == {"1.1": 1, "1.1.3": 0, "1.2": 0, "2.1": 0, "2.2": 0}
 
     def test_inputs_are_a_plain_table_with_any_columns(
         self, workbook_path: Path

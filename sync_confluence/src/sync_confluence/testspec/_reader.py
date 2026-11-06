@@ -10,7 +10,6 @@ from openpyxl.workbook.workbook import Workbook
 
 from sync_confluence.testspec._index import read_index
 from sync_confluence.testspec._model import SheetTable, TestCase, TestSpecError
-from sync_confluence.testspec._outputs import normalise_outputs
 from sync_confluence.testspec._sheet_names import (
     INPUTS_SUFFIX,
     OUTPUTS_SUFFIX,
@@ -42,10 +41,7 @@ def _check_unexpected_sheets(sheets: dict[str, str], cases: list[TestCase]) -> N
 
 def _attach_sheets(case: TestCase, workbook: Workbook, sheets: dict[str, str]) -> None:
     case.inputs = _optional_sheet(workbook, sheets, f"{case.test_id}{INPUTS_SUFFIX}")
-    outputs_name = f"{case.test_id}{OUTPUTS_SUFFIX}"
-    outputs = _optional_sheet(workbook, sheets, outputs_name)
-    if outputs is not None:
-        case.outputs = normalise_outputs(outputs, outputs_name)
+    case.outputs = _optional_sheet(workbook, sheets, f"{case.test_id}{OUTPUTS_SUFFIX}")
 
 
 def read_workbook(path: Path) -> list[TestCase]:

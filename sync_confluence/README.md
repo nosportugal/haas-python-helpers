@@ -163,10 +163,18 @@ matched case-insensitively; the first non-empty row of each sheet is the header 
 | Sheet            | Required | Content                                                                                                  |
 | ---------------- | -------- | -------------------------------------------------------------------------------------------------------- |
 | **First sheet**  | yes      | The **Index**: one row per test case. Its name is not significant                                        |
-| `<ID> - Inputs`  | no       | A table with any columns. Shown as-is on the page of the test with that `ID`                             |
-| `<ID> - Outputs` | no       | A table that must have a `JSON` column, plus any other columns (e.g. `CLI`). `JSON` cells must be valid  |
+| `<ID> - Inputs`  | no       | A table with any columns, shown as-is on the page of the test with that `ID`                             |
+| `<ID> - Outputs` | no       | A table with any columns, shown as-is on the page of the test with that `ID`                             |
 
 No other sheet is allowed (see [Rejected sheets](#rejected-sheets)).
+
+`Inputs` and `Outputs` sheets have **no required columns and no value rules**: the team that
+writes the test cases decides what they hold, for example a column of full JSON documents, a
+column of partial JSON, or a `Parameter | Value` table. The tool only renders the table as
+written: the first row is the header, every following row is a row, and line breaks inside a
+cell are kept. Cell text is shown as plain text, so indentation inside a cell is not preserved.
+Empty columns at the right are dropped; a column that holds data is always kept, even if its
+header is blank.
 
 #### Index sheet
 

@@ -37,8 +37,22 @@ def _fit(row: list[str], width: int) -> list[str]:
     return fitted
 
 
+def _used_width(rows: list[list[str]]) -> int:
+    """Width of the table: up to the last column with a header or any data."""
+    width = 0
+    for row in rows:
+        for position, cell_value in enumerate(row, start=1):
+            if cell_value.strip():
+                width = max(width, position)
+    return width
+
+
 def read_sheet(worksheet: Worksheet) -> SheetTable:
-    """Return the first non-empty row as headers and the non-empty rows below."""
+    """Return the first non-empty row as headers and the non-empty rows below.
+
+    Columns are kept up to the last one that has a header or any data, so
+    data under a blank header is never dropped.
+    """
     rows = [
         [cell_text(cell_value) for cell_value in row]
         for row in worksheet.iter_rows(values_only=True)
@@ -46,12 +60,10 @@ def read_sheet(worksheet: Worksheet) -> SheetTable:
     rows = [row for row in rows if any(cell.strip() for cell in row)]
     if not rows:
         raise TestSpecError(f"Sheet '{worksheet.title}' is empty")
-    headers = [header.strip() for header in rows[0]]
-    while headers and not headers[-1]:
-        headers.pop()
+    width = _used_width(rows)
     return SheetTable(
-        headers=headers,
-        rows=[_fit(row, len(headers)) for row in rows[1:]],
+        headers=[header.strip() for header in _fit(rows[0], width)],
+        rows=[_fit(row, width) for row in rows[1:]],
     )
 
 

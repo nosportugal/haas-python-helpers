@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import datetime
-import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -15,6 +14,7 @@ from sync_confluence.confluence._page_metadata import _apply_page_metadata
 from sync_confluence.confluence._types import PageUpsertRequest
 from sync_confluence.confluence.sync_cli import new_sync_result
 from sync_confluence.testspec import (
+    SheetTable,
     TestCase,
     TestSpecError,
     TestSpecSyncConfig,
@@ -87,19 +87,21 @@ class TestReadWorkbook:
 
     def test_example_workbook_follows_the_format(self) -> None:
         cases = read_workbook(_EXAMPLE)
+        header = [
+            cell.value for cell in openpyxl.load_workbook(_EXAMPLE).worksheets[0][1]
+        ]
 
-        assert [case.test_id for case in cases] == [
-            "1.1",
-            "1.2",
-            "2.1",
-            "2.2",
-            "1.1.3",
-        ]
-        assert [header for header, _ in cases[0].extra_fields] == [
-            "Type",
-            "Component",
-            "Priority",
-        ]
+        assert header[:4] == ["ID", "Name", "Description", "Tags"]
+        assert header[4:] == ["Type", "Component", "Priority"]
+        assert [case.test_id for case in cases] == ["1.1", "1.1.3", "1.2", "2.1", "2.2"]
+        assert [name for name, _ in cases[0].extra_fields] == header[4:]
+
+    def test_example_workbook_shows_different_output_layouts(self) -> None:
+        by_id = {case.test_id: case for case in read_workbook(_EXAMPLE)}
+
+        assert by_id["1.1"].outputs.headers == ["Response"]
+        assert by_id["2.1"].outputs.headers == ["Parameter", "Value"]
+        assert by_id["1.1.3"].outputs.headers == ["Check", "Expected (partial)"]
 
     def test_inputs_are_a_plain_table_with_any_columns(
         self, workbook_path: Path
@@ -113,11 +115,14 @@ class TestReadWorkbook:
             ["vrfName", "string", "A"],
         ]
 
-    def test_pretty_prints_json_outputs(self, workbook_path: Path) -> None:
+    def test_outputs_are_kept_exactly_as_written(self, workbook_path: Path) -> None:
         first, _ = read_workbook(workbook_path)
 
         assert first.outputs is not None
-        assert first.outputs.rows[0][2] == json.dumps({"vrf-name": "A"}, indent=2)
+        assert first.outputs.headers == ["Target", "CLI", "JSON"]
+        assert first.outputs.rows == [
+            ["/vrfs", "vrf A\n address-family ipv4", '{"vrf-name":"A"}']
+        ]
 
     def test_missing_per_test_sheets_are_none(self, workbook_path: Path) -> None:
         _, second = read_workbook(workbook_path)
@@ -221,29 +226,49 @@ class TestReadWorkbook:
 
         assert ordered == ["1", "1.1", "1.1.3", "1.2", "1.10"]
 
-    def test_rejects_invalid_json(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize(
+        "outputs",
+        [
+            # a single column of full JSON documents
+            [["Expected"], ['{"a": 1, "b": [1, 2]}']],
+            # a partial / not even valid JSON fragment is fine too
+            [["Expected"], ['"b": [1, 2'], ["..."]],
+            # a parameter | value table
+            [["Parameter", "Value"], ["mtu", 9000], ["vrf", "A"]],
+            # free text with no recognisable header
+            [["Check"], ["Interface is up"]],
+        ],
+    )
+    def test_outputs_may_have_any_layout(
+        self, tmp_path: Path, outputs: list[list]
+    ) -> None:
         sheets = _valid_sheets()
-        sheets["1.1 - Outputs"] = [["CLI", "JSON"], ["vrf A", "{not json"]]
-
-        with pytest.raises(TestSpecError, match="data row 1: invalid JSON"):
-            read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
-
-    def test_accepts_json_only_outputs(self, tmp_path: Path) -> None:
-        sheets = _valid_sheets()
-        sheets["1.1 - Outputs"] = [["JSON"], ['{"mtu": 9000}']]
+        sheets["1.1 - Outputs"] = outputs
 
         first, _ = read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
 
         assert first.outputs is not None
-        assert first.outputs.headers == ["JSON"]
-        assert first.outputs.rows == [[json.dumps({"mtu": 9000}, indent=2)]]
+        assert first.outputs.headers == [str(h) for h in outputs[0]]
+        assert len(first.outputs.rows) == len(outputs) - 1
 
-    def test_requires_json_column_in_outputs(self, tmp_path: Path) -> None:
+    def test_data_under_a_blank_header_is_kept(self, tmp_path: Path) -> None:
         sheets = _valid_sheets()
-        sheets["1.1 - Outputs"] = [["CLI"], ["vrf A"]]
+        sheets["1.1 - Inputs"] = [["Name", "Value", None], ["mtu", 1, "extra"]]
 
-        with pytest.raises(TestSpecError, match="no 'JSON' column"):
-            read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
+        first, _ = read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
+
+        assert first.inputs is not None
+        assert first.inputs.headers == ["Name", "Value", ""]
+        assert first.inputs.rows == [["mtu", "1", "extra"]]
+
+    def test_empty_trailing_columns_are_trimmed(self, tmp_path: Path) -> None:
+        sheets = _valid_sheets()
+        sheets["1.1 - Inputs"] = [["Name", "Value", None, None], ["mtu", 1, None, None]]
+
+        first, _ = read_workbook(_write_workbook(tmp_path / "spec.xlsx", sheets))
+
+        assert first.inputs is not None
+        assert first.inputs.headers == ["Name", "Value"]
 
     @pytest.mark.parametrize("missing", ["ID", "Name", "Description", "Tags"])
     def test_requires_every_mandatory_column(
@@ -329,6 +354,14 @@ class TestReadWorkbook:
 
 class TestRenderTestCase:
     @staticmethod
+    def _rows(table: etree._Element) -> list[list[str]]:
+        """Cell text of every row, line breaks collapsed to a space."""
+        return [
+            [" ".join("".join(cell.itertext()).split()) for cell in row]
+            for row in table.iter("tr")
+        ]
+
+    @staticmethod
     def _details(root: etree._Element) -> list[str]:
         """Text of the paragraphs that come before the Description heading."""
         details = []
@@ -384,19 +417,46 @@ class TestRenderTestCase:
         assert notes.find("strong").tail == " first"
         assert notes.find("br").tail == "second"
 
-    def test_renders_cli_and_json_as_code_macros(self, workbook_path: Path) -> None:
-        root = self._render(workbook_path, 0)
-        ac_ns = "{http://atlassian.com/content}"
-        macros = [
-            m
-            for m in root.iter(f"{ac_ns}structured-macro")
-            if m.get(f"{ac_ns}name") == "code"
-        ]
+    def test_tables_render_as_written_with_no_special_columns(
+        self, workbook_path: Path
+    ) -> None:
+        root = self._render(workbook_path, 0, generated_by="")
+        inputs, outputs = root.findall("table")
 
-        languages = [m.findtext(f"{ac_ns}parameter") for m in macros]
-        bodies = [m.findtext(f"{ac_ns}plain-text-body") for m in macros]
-        assert languages == [None, "json"]
-        assert bodies[0] == "vrf A\n address-family ipv4"
+        assert self._rows(inputs) == [
+            ["Characteristic", "Type", "Value"],
+            ["mtu", "integer", "9000"],
+            ["vrfName", "string", "A"],
+        ]
+        assert self._rows(outputs) == [
+            ["Target", "CLI", "JSON"],
+            ["/vrfs", "vrf A address-family ipv4", '{"vrf-name":"A"}'],
+        ]
+        assert not list(root.iter("{http://atlassian.com/content}structured-macro"))
+
+    def test_multiline_cells_keep_their_line_breaks(self, workbook_path: Path) -> None:
+        outputs = self._render(workbook_path, 0).findall("table")[1]
+        cell = outputs.findall(".//tr")[1].findall("td")[1]
+
+        assert cell.text == "vrf A"
+        assert cell.find("br").tail == " address-family ipv4"
+
+    @pytest.mark.parametrize(
+        "table",
+        [
+            [["Expected"], ['{"a": {"b": 1}}']],
+            [["Parameter", "Value"], ["mtu", "9000"], ["vrf", "A"]],
+            [["x"], ["<b>&amp; not markup</b>"]],
+        ],
+    )
+    def test_any_table_round_trips(self, table: list[list[str]]) -> None:
+        case = _case("1.1")
+        case.outputs = SheetTable(headers=table[0], rows=table[1:])
+
+        body = render_test_case(case, Path("spec.xlsx"), generated_by="")
+        root = etree.fromstring(f"<root>{body}</root>")
+
+        assert self._rows(root.findall("table")[0]) == table
 
     def test_multiline_description_uses_line_breaks(self, workbook_path: Path) -> None:
         root = self._render(workbook_path, 0)

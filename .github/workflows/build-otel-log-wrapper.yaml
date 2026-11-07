@@ -14,13 +14,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.1
 
       - name: Validate package
         uses: ./.github/actions/validate-package
         with:
           package-dir: otel_log_wrapper
-          python-version: '3.x'
+          python-version: "3.x"
 
   deploy:
     name: Build and release otel_log_wrapper package
@@ -28,15 +28,15 @@ jobs:
     needs: validate
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.1
 
       - name: Build package
         uses: ./.github/actions/build-and-release
         with:
           package-dir: otel_log_wrapper
-          python-version: '3.x'
+          python-version: "3.x"
 
       - name: Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v3.0.4
         with:
           files: ./otel_log_wrapper/dist/*

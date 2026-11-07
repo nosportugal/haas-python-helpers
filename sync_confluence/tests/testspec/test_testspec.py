@@ -856,6 +856,32 @@ class TestJsonColumns:
             '{\n  "n": 12345678901234567890,\n  "u": "caf\u00e9"\n}'
         ]
 
+    def test_non_finite_numbers_are_shown_unchanged_when_reformatting(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        written = '{"limit": 1e400}'
+
+        with caplog.at_level("WARNING"):
+            table = _render_json_table([written], reformat=True)
+
+        assert _bodies(table) == [written]
+        assert "cannot be reformatted" in caplog.text
+
+    def test_oversized_integer_is_shown_unchanged(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        written = "1" * 5000
+
+        with caplog.at_level("WARNING"):
+            table = _render_json_table([written])
+
+        assert _bodies(table) == [written]
+
+    def test_cell_text_keeps_nbsp_and_trailing_newlines(self) -> None:
+        from sync_confluence.testspec._sheets import cell_text
+
+        assert cell_text('{"a": "x\xa0y"}\n') == '{"a": "x\xa0y"}\n'
+
     def test_reformat_drops_duplicate_keys_which_is_why_it_is_opt_in(self) -> None:
         table = _render_json_table(['{"d": 1, "d": 2}'], reformat=True)
 

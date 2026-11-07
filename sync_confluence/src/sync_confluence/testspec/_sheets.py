@@ -28,7 +28,9 @@ def cell_text(cell_value: Any) -> str:
         return str(int(cell_value))
     if isinstance(cell_value, datetime.datetime):
         return _datetime_text(cell_value)
-    return str(cell_value).replace("\xa0", " ").rstrip()
+    # Contents are kept verbatim (e.g. JSON strings); headers and Index
+    # fields are trimmed by their own consumers.
+    return str(cell_value)
 
 
 def _fit(row: list[str], width: int) -> list[str]:

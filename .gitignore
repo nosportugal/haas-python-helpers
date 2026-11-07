@@ -64,6 +64,7 @@ junit*.xml
 .github/instructions
 .github/prompts
 .github/skills
+AGENTS.md
 
 # Temporary folder
 .tmp/*

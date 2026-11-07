@@ -33,9 +33,7 @@ def json_cell_text(cell_text: str, reformat: bool, where: str) -> str:
         return cell_text
     if reformat:
         try:
-            return json.dumps(
-                document, indent=2, ensure_ascii=False, allow_nan=False
-            )
+            return json.dumps(document, indent=2, ensure_ascii=False, allow_nan=False)
         except ValueError as exc:  # non-finite floats such as 1e400
             log.warning("%s: cannot be reformatted (%s); shown unchanged", where, exc)
     return cell_text

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-from sync_confluence.converter import Attachment
+from sync_confluence.confluence.storage_format import Attachment
 
 
 @dataclass
@@ -23,6 +23,7 @@ class PageUpsertRequest:
     source_path_map: Optional[dict[str, str]] = None
     page_width: Optional[str] = None
     attachments: list[Attachment] = field(default_factory=list)
+    labels: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -35,6 +36,9 @@ class FolderUpsertRequest:
     dry_run: bool = False
     managed_by_label: Optional[str] = None
     source_path: Optional[str] = None
+    # When set, an existing folder is reused only if it already carries
+    # managed_by_label (see ensure_folder_owned).
+    require_ownership: bool = False
 
 
 @dataclass
@@ -46,3 +50,6 @@ class DeleteOrphansRequest:
     dry_run: bool = False
     managed_by_label: Optional[str] = None
     expected_paths: Optional[set[str]] = None
+    # When set, only pages whose stored source path starts with this prefix
+    # are eligible for deletion (pages without a source path are kept).
+    source_path_prefix: Optional[str] = None

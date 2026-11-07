@@ -44,7 +44,7 @@ pip install git+https://github.com/nosportugal/haas-python-helpers.git#subdirect
 Add `--dry-run` to preview what would be created, updated, or deleted without making any API calls.
 
 ```bash
-python -m sync_confluence \
+sync-confluence-markdown \
   --url  https://acme.atlassian.net \
   --email user@acme.com \
   --token <api-token> \
@@ -55,7 +55,7 @@ python -m sync_confluence \
 ### CLI Example: Sync a flat list of Markdown files
 
 ```bash
-python -m sync_confluence \
+sync-confluence-markdown \
   --url https://acme.atlassian.net \
   --email user@acme.com \
   --token <api-token> \
@@ -75,7 +75,7 @@ export CONFLUENCE_API_TOKEN=<api-token>
 export CONFLUENCE_SPACE_KEY=DOCS
 export CONFLUENCE_PARENT_PAGE_ID=12345
 
-python -m sync_confluence
+sync-confluence-markdown
 ```
 
 ### Orphan cleanup (always active)
@@ -116,7 +116,7 @@ CLI flags take precedence over environment variables. Required flags must be sup
 - `--no-generated-by`: Suppress the auto-generated banner panel
 - `--page-width` / `CONFLUENCE_PAGE_WIDTH`: Set display width for every synced page.
   `full-width` renders content across the full browser width; `default` uses the standard Confluence narrow layout.
-  Omit to leave page widths unchanged
+  Omit to leave page widths unchanged. Invalid values are rejected, including from the environment variable
 - `--dry-run`: Preview pages that would be created, updated, or deleted without making any API calls
 - `--log-level` / `LOG_LEVEL`: Logging verbosity — `DEBUG`, `INFO`, `WARNING`, `ERROR` (default: `INFO`)
 
@@ -139,6 +139,198 @@ A named container folder with the given title is found under `--parent-id` (or c
 - The root `README.md` becomes the section parent page (unless `--no-root` is set).
 - Any `README.md` inside a subdirectory becomes a regular child page under that folder, not a section parent.
 - All other `.md` files become leaf pages under their respective folder or parent.
+
+## Test specifications from Excel (`sync-confluence-testspec`)
+
+Publishes a test-specification workbook (`.xlsx`) as one Confluence page per test case.
+All pages of a workbook are listed in one **suite folder** under `--parent-id`. Requires
+the `xlsx` extra:
+
+```bash
+pip install "sync-confluence[xlsx] @ git+https://github.com/nosportugal/haas-python-helpers.git#subdirectory=sync_confluence"
+
+sync-confluence-testspec --xlsx HAAS-L3VPN-CISCO__l3vpn_tests.xlsx --space HaaS --parent-id 12345 --dry-run
+```
+
+A ready-made example that follows this format is in
+[`examples/DEMO-EXAMPLE__format_example.xlsx`](examples/DEMO-EXAMPLE__format_example.xlsx).
+
+### Workbook format
+
+The format is the same for any kind of test (unit, integration, E2E, ...). Headers are
+matched case-insensitively; the first non-empty row of each sheet is the header row.
+
+| Sheet            | Required | Content                                                                                                  |
+| ---------------- | -------- | -------------------------------------------------------------------------------------------------------- |
+| **First sheet**  | yes      | The **Index**: one row per test case. Its name is not significant                                        |
+| `<ID> - Inputs`  | no       | A table with any columns, shown as-is on the page of the test with that `ID`                             |
+| `<ID> - Outputs` | no       | A table with any columns, shown as-is on the page of the test with that `ID`                             |
+
+No other sheet is allowed (see [Rejected sheets](#rejected-sheets)).
+
+`Inputs` and `Outputs` sheets have **no required columns and no value rules**: the team that
+writes the test cases decides what they hold, for example a column of full JSON documents, a
+column of partial JSON, or a `Parameter | Value` table. The tool only renders the table as
+written: the first row is the header, every following row is a row, and line breaks inside a
+cell are kept. Empty columns at the right are dropped; a column that holds data is always kept,
+even if its header is blank.
+
+The only column name with a meaning is **`JSON`** (any case), in `Inputs` and `Outputs`: its
+cells are shown in a JSON code block, so indentation and line breaks are kept. The text is shown
+**as written** and a cell is never rejected: a fragment, a placeholder or several documents are
+shown unchanged, and each cell that is not valid JSON is logged as a warning. Every other column is
+plain text, where indentation inside a cell is not preserved.
+
+With `--format-json` (`TESTSPEC_FORMAT_JSON=true`), valid JSON cells are pretty-printed. This is
+off by default because it can change a cell: a duplicate key is dropped (`{"d":1,"d":2}` becomes
+`{"d": 2}`), `1.50` becomes `1.5`, and any hand-made layout is lost. Key order, big integers and
+non-ASCII characters are kept.
+
+#### Index sheet
+
+The first sheet is always the Index. Its header row must contain these **mandatory
+columns**; a missing one fails the run:
+
+| Column        | Meaning                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------ |
+| `ID`          | Test identifier: dot-separated numbers with **any number of levels** (`1`, `1.1`, `1.1.3`), unique in the workbook. Format the column as **Text** so `1.10` is not read as `1.1`. Tests are ordered numerically, level by level |
+| `Name`        | Short test name (required on every row)                                                                      |
+| `Description` | What the test checks; may be empty on a row. A blank line starts a new paragraph                             |
+| `Tags`        | Free-form tags separated by `;` or `,`; may be empty on a row. Tags are also applied as page labels         |
+
+Any **other column** is an additional column. Additional columns have no special meaning
+and no value rules: they are handled all alike, and their header is used as the field name
+on the page. Their position in the table sets their order on the page. Headers must not be
+blank or repeated.
+
+#### Page layout
+
+```text
+Tags: <tags>
+<additional column 1>: <value>
+<additional column 2>: <value>
+...
+Description
+Inputs
+Outputs
+```
+
+`Tags` is always the first field, then the additional columns in the order they appear in
+the Index table, then `Description`, `Inputs` and `Outputs`. Fields with no value show `-`.
+Missing `Inputs`/`Outputs` sheets render as "Not specified yet.". An Index without test cases
+also fails the run. The workbook is fully validated before any Confluence call.
+
+#### Rejected sheets
+
+A sheet other than the Index, `<ID> - Inputs` and `<ID> - Outputs` fails the run, so a
+mistyped name can never silently drop its content. `<ID>` must be listed in the Index; the
+match ignores case and surrounding spaces. The error names each sheet and says why:
+
+| Sheet name       | Reason reported                                                    |
+| ---------------- | ------------------------------------------------------------------ |
+| `1.1.3 - Inputs` | refers to ID `1.1.3`, which is not in the Index                    |
+| `1.1- Inputs`    | must be named exactly `1.1 - Inputs`                               |
+| `Notes`          | is neither the Index (first sheet) nor named `<ID> - Inputs`/`Outputs` |
+
+The message always ends with the list of IDs found in the Index.
+
+### Workbook file name
+
+The file name carries the **suite ID**, the identifier that keeps the pages of different
+workbooks apart in a Confluence space. It is checked before any Confluence call.
+
+```text
+<ID>[__<description>].xlsx
+
+<FOO>-<BAR>_<QUX>__<corge>_<garply>.xlsx
+ |     |    |      └─ description: free text, ignored by the tool
+ |     |    └──────── more words of the same segment, joined with _
+ |     └───────────── segment
+ └─────────────────── project (the owning team's Jira project key)
+```
+
+| Part          | Rule                                                                                           |
+| ------------- | ---------------------------------------------------------------------------------------------- |
+| `ID`          | `PROJECT-SEGMENT` plus up to two more `-SEGMENT`s; at most 24 characters                       |
+| `PROJECT`     | 2 to 10 characters: uppercase ASCII letters and digits, starting with a letter                 |
+| `SEGMENT`     | Uppercase ASCII letters and digits; `_` joins words inside a segment (`ROUTING_CORE`)          |
+| `__`          | Two underscores end the ID. A single `_` never does                                            |
+| `description` | Optional. ASCII letters, digits, `.`, `_`, `-`, starting with a letter or digit. Never used    |
+
+No spaces and no non-ASCII characters are allowed anywhere in the file name; `_` is the word
+separator. The ID must be uppercase, because file systems and Confluence may treat names that
+differ only by case as the same.
+
+| File name                                    | Suite ID                |
+| -------------------------------------------- | ----------------------- |
+| `HAAS-493__routing_acceptance.xlsx`          | `HAAS-493`              |
+| `HAAS-ROUTING_CORE-E2E__end_to_end_v2.xlsx`  | `HAAS-ROUTING_CORE-E2E` |
+| `HAAS-L3VPN-CISCO.xlsx`                      | `HAAS-L3VPN-CISCO`      |
+
+A name that breaks the rule fails the run and the error says why, for example
+`Testes serviço L3VPN - Cisco.xlsx` ("must not contain spaces") or `HAAS-493_routing.xlsx`
+("Did you mean `HAAS-493__routing`?").
+
+**Two workbooks with the same ID are the same suite.** Syncing one updates the pages of the
+other and cleanup deletes the pages that are no longer in the file. The description is free, so
+`HAAS-L3VPN-CISCO__v1.xlsx` and `HAAS-L3VPN-CISCO__v2.xlsx` are two versions of one suite; the
+last one synced wins. Keep **one workbook per variant** (vendor, environment, platform, ...)
+and put the variant in the ID: `HAAS-L3VPN-CISCO` and `HAAS-L3VPN-NOKIA` are different suites,
+whereas `HAAS-L3VPN__cisco.xlsx` and `HAAS-L3VPN__nokia.xlsx` are the same one. The tool only
+checks the format, so keeping IDs unique across teams is a convention to agree on; using the
+team's Jira project key as the first part keeps teams apart.
+
+### Titles, folders and cleanup
+
+Confluence titles are unique per space, so titles carry the **suite ID** (from the
+[file name](#workbook-file-name) or `--suite`). The suite folder is titled `<suite>` and each
+page `<ID> - <Name> (<suite>)`, for example `HAAS-L3VPN-CISCO` and
+`1.1 - Create L3VPN Leg (HAAS-L3VPN-CISCO)`. A page title longer than Confluence's 255
+characters fails the run, naming the tests whose `Name` must be shortened.
+Labels are added, never removed, when tags change.
+
+`sync-confluence-testspec` accepts the connection, `--dry-run`, `--managed-by`, `--log-level`,
+`--page-width`, `--generated-by` and `--no-generated-by` options described above, plus:
+
+- `--xlsx` / `TESTSPEC_XLSX`: Path to the workbook — **required**
+- `--format-json` / `TESTSPEC_FORMAT_JSON`: Pretty-print valid JSON in `JSON` columns (default: off, text shown as written)
+- `--suite` / `TESTSPEC_SUITE`: Suite ID used in titles and to scope cleanup (default: the ID at the start of the workbook file name). It is only an ID, without `__<description>`, and follows the same rules as in the file name
+
+The default managed-by label is `managed-by-<repo>-testspec`, separate from the Markdown sync's
+`managed-by-<repo>`, so both commands can share a `--parent-id` without deleting each other's pages.
+An explicit `--managed-by` is used as given.
+
+Orphan cleanup only considers pages of the **same suite** (stored source path
+`testspec/<suite>/...`): those under `--parent-id` that are no longer in the workbook are
+**permanently deleted**, while other workbooks synced to the same parent are left alone.
+If the suite folder title already exists elsewhere in the space, the run fails without cleanup
+instead of publishing under the other parent. An existing suite folder under `--parent-id` is
+only reused when it already carries the managed-by label; a folder someone created by hand with
+the same title fails the run instead of being adopted (and later becoming eligible for deletion).
+Add the label to the folder to adopt it deliberately. In both commands cleanup is
+skipped for the whole run when any page was skipped (title collision), so a page that could not
+be moved is never deleted.
+
+## Deprecated aliases
+
+Deprecated in 0.2.0, removal planned for 0.3.0 — migrate to `sync-confluence-markdown`:
+
+- the `sync-confluence` command and `python -m sync_confluence` (they log a deprecation warning, then run `sync-confluence-markdown`);
+- the `sync_confluence.cli`, `sync_confluence.converter` and `sync_confluence.traversal` import paths (use `sync_confluence.markdown.cli`, `.converter` and `.traversal`).
+
+## Package layout
+
+```text
+sync_confluence/
+├── confluence/                  shared Confluence API (pages, folders, labels, cleanup)
+│   ├── storage_format/          Confluence Storage Format (CSF) XML builders; stdlib + lxml only
+│   └── sync_cli/                shared command-line plumbing (args, session, orphan cleanup, sync result)
+├── markdown/                    sync-confluence-markdown  (converter/, traversal/, cli/)
+└── testspec/                    sync-confluence-testspec
+```
+
+Lower layers never import higher ones; `tests/test_layout.py` enforces this.
+Front ends import shared code from package level (`sync_confluence.confluence[.storage_format|.sync_cli]`), never from another subpackage's `_private` module.
 
 ## Development
 
@@ -170,7 +362,7 @@ Add the following steps to your workflow to sync docs on every push to `main`:
 
 - name: Sync to Confluence
   run: |
-    python -m sync_confluence \
+    sync-confluence-markdown \
       --space "${{ vars.CONFLUENCE_SPACE_KEY }}" \
       --parent-id "${{ vars.CONFLUENCE_PARENT_PAGE_ID }}" \
       --git-ref "${{ github.ref_name }}"
@@ -182,17 +374,17 @@ Add the following steps to your workflow to sync docs on every push to `main`:
 
 Required GitHub repository secrets (`Settings → Secrets and variables → Actions`):
 
-| Secret | Value |
-| --- | --- |
-| `CONFLUENCE_URL` | `https://<tenant>.atlassian.net` |
-| `CONFLUENCE_EMAIL` | Atlassian account email |
-| `CONFLUENCE_API_TOKEN` | API token from id.atlassian.com |
+| Secret                 | Value                            |
+| ---------------------- | -------------------------------- |
+| `CONFLUENCE_URL`       | `https://<tenant>.atlassian.net` |
+| `CONFLUENCE_EMAIL`     | Atlassian account email          |
+| `CONFLUENCE_API_TOKEN` | API token from id.atlassian.com  |
 
 Required GitHub repository variables (same settings page, `Variables` tab):
 
-| Variable | Value |
-| --- | --- |
-| `CONFLUENCE_SPACE_KEY` | Target space key (e.g. `DOCS`) |
+| Variable                    | Value                                      |
+| --------------------------- | ------------------------------------------ |
+| `CONFLUENCE_SPACE_KEY`      | Target space key (e.g. `DOCS`)             |
 | `CONFLUENCE_PARENT_PAGE_ID` | Numeric ID of the pre-existing parent page |
 
 ## License

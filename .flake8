@@ -3,3 +3,10 @@ select = WPS
 per-file-ignores =
     */__init__.py: WPS410, WPS412
     sync_confluence/src/sync_confluence/confluence/_constants.py: WPS110, WPS115
+    # _admonitions.py: WPS232 — the multi-alert splitting algorithm raises module
+    # cognitive complexity beyond the default threshold; the algorithm cannot be
+    # further decomposed without exceeding the WPS202 module-member limit.
+    sync_confluence/src/sync_confluence/markdown/converter/_admonitions.py: WPS232
+    # Deprecated shim: re-exports the 10 names of the old converter public API
+    # (WPS235 limit is 8); removed together with the shim in 0.3.0.
+    sync_confluence/src/sync_confluence/converter/__init__.py: WPS235, WPS410, WPS412

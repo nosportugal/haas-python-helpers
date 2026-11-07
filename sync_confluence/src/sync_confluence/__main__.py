@@ -1,3 +1,3 @@
-from sync_confluence.cli import main
+from sync_confluence.markdown.cli import deprecated_sync_confluence_main
 
-main()
+deprecated_sync_confluence_main()

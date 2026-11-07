@@ -58,3 +58,14 @@ junit*.xml
 .idea/
 .vscode/
 *.py,cover
+
+# Agent docs
+.github/agents
+.github/instructions
+.github/prompts
+.github/skills
+AGENTS.md
+
+# Temporary folder
+.tmp/*
+!.tmp/.gitkeep

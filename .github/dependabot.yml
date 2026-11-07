@@ -25,3 +25,15 @@ updates:
       opentelemetry:
         patterns:
           - "opentelemetry-*"
+
+  # Python dependencies (uv lockfile)
+  - package-ecosystem: uv
+    directory: /sync_confluence
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      sync-confluence-minor-patch:
+        update-types:
+          - minor
+          - patch

@@ -6,15 +6,16 @@ from atlassian import Confluence
 
 from sync_confluence.confluence._constants import (
     _SOURCE_PATH_PROPERTY_KEY,
-    _Actions,
+    PageSyncAction,
     _Keys,
 )
 from sync_confluence.confluence._folder_create import (
     _create_folder_with_fallback,
     _upsert_folder_dry_run,
 )
+from sync_confluence.confluence._folder_ownership import ensure_folder_owned
 from sync_confluence.confluence._logging import log
-from sync_confluence.confluence._lookup import _find_folder_under_parent
+from sync_confluence.confluence._lookup import find_folder_under_parent
 from sync_confluence.confluence._properties import _apply_label, _try_property_set
 from sync_confluence.confluence._types import FolderUpsertRequest
 
@@ -22,6 +23,7 @@ from sync_confluence.confluence._types import FolderUpsertRequest
 def _refresh_existing_folder(
     confluence: Confluence, request: FolderUpsertRequest, existing_id: str
 ) -> tuple[str, str]:
+    ensure_folder_owned(confluence, existing_id, request)
     log.debug("Unchanged folder: '%s' (id=%s)", request.title, existing_id)
     # Re-apply label so it is self-healing if it was ever missing.
     if request.managed_by_label:
@@ -34,7 +36,7 @@ def _refresh_existing_folder(
             request.source_path,
             "source path",
         )
-    return (existing_id, _Actions.UNCHANGED)
+    return (existing_id, PageSyncAction.UNCHANGED)
 
 
 def upsert_folder(
@@ -50,7 +52,7 @@ def upsert_folder(
     """
     if request.dry_run:
         return _upsert_folder_dry_run(request)
-    existing = _find_folder_under_parent(
+    existing = find_folder_under_parent(
         confluence, request.space_key, request.title, request.parent_id
     )
     if existing:

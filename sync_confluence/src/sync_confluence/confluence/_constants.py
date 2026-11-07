@@ -1,6 +1,6 @@
 """Constants grouped to keep the module member count under WPS202.
 
-The :class:`_Keys` and :class:`_Actions` containers hold the Confluence API
+The :class:`_Keys` and :class:`PageSyncAction` containers hold the Confluence API
 response field names and the upsert result actions, respectively.  Using
 classes keeps the related names together and counts as a single module
 member each.
@@ -21,8 +21,8 @@ class _Keys:
     RESULTS = "results"
 
 
-class _Actions:
-    """Action values returned by upsert operations."""
+class PageSyncAction:
+    """Page sync action values (created, updated, unchanged, skipped)."""
 
     CREATED = "created"
     UPDATED = "updated"
@@ -30,7 +30,8 @@ class _Actions:
     SKIPPED = "skipped"
 
 
-_DRY_RUN_ID = "DRY-RUN"
+# Dry-run placeholder page id returned instead of a real Confluence id.
+DRY_RUN_PAGE_ID = "DRY-RUN"
 _HASH_PROPERTY_KEY = "sync_confluence_hash"
 _SOURCE_PATH_PROPERTY_KEY = "sync_confluence_source_path"
 _APPEARANCE_PUBLISHED_KEY = "content-appearance-published"
